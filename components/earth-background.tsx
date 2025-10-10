@@ -28,20 +28,16 @@ export function EarthBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" style={{ contain: "layout paint size" }}>
       {/* Video layer */}
-      <video
-        ref={videoRef}
-        className="h-full w-full object-cover"
-        src="/videos/earth.mp4"
-        // Using a token-friendly soft poster to avoid hard-coded colors
-        poster="/earth-view-from-space.jpg"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="metadata"
-      />
-      {/* Overlay for readability over bright frames */}
-      <div className="absolute inset-0 bg-background/60" />
+      <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted loop playsInline preload="auto">
+        {/* Prefer root public path first: /public/main-earth-bg.mp4 */}
+        <source src="/main-earth-bg.mp4" type="video/mp4" />
+        {/* Fallback if the file is inside /public/videos */}
+        <source src="/videos/main-earth-bg.mp4" type="video/mp4" />
+      </video>
+
+      {/* Readability overlays: subtle vignette + top/bottom gradient using tokens */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.25)_100%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/10 to-background/50" />
     </div>
   )
 }
