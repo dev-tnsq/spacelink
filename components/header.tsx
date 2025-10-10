@@ -10,16 +10,31 @@ export const Header = () => {
           <span className="font-mono uppercase tracking-widest text-foreground">SpaceLink</span>
         </Link>
 
-        <nav className="flex max-lg:hidden absolute left-1/2 -translate-x-1/2 items-center justify-center gap-x-10">
-          {["Network", "Marketplace", "Docs", "Contact"].map((item) => (
-            <Link
-              className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
-              href={`#${item.toLowerCase()}`}
-              key={item}
-            >
-              {item}
-            </Link>
-          ))}
+        <nav className="flex max-lg:hidden absolute left-1/2 -translate-x-1/2 items-center justify-center gap-x-8">
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="#marketplace"
+          >
+            Marketplace
+          </Link>
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="#register-satellite"
+          >
+            Register Satellite
+          </Link>
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="#register-node"
+          >
+            Register Node
+          </Link>
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="#docs"
+          >
+            Docs
+          </Link>
         </nav>
 
         <Link
