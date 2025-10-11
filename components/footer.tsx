@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
 export function Footer() {
+  const { ref, isVisible } = useScrollAnimation()
   const currentYear = new Date().getFullYear()
 
   const links = {
@@ -29,9 +31,11 @@ export function Footer() {
   return (
     <>
       {/* CTA Section */}
-      <section className="relative z-10 py-20 md:py-28">
+      <section ref={ref} className="relative z-10 py-20 md:py-28">
         <div className="container max-w-5xl">
-          <div className="bg-gradient-to-br from-primary/20 via-background/80 to-background/60 backdrop-blur-md border border-primary/30 rounded-xl p-8 md:p-12 text-center">
+          <div className={`bg-gradient-to-br from-primary/20 via-background/80 to-background/60 backdrop-blur-md border border-primary/30 rounded-xl p-8 md:p-12 text-center ${
+            isVisible ? 'animate-fade-in-up' : 'opacity-0'
+          }`}>
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4 text-foreground">
               Get Started with SpaceLink
             </h2>

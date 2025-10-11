@@ -112,9 +112,10 @@ p {
   height: 100%;
 }
 
-/* Smooth scroll behavior */
+/* Smooth scroll behavior with offset for fixed header */
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 120px; /* Offset for fixed header */
 }
 
 /* Custom scrollbar */
@@ -133,4 +134,90 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
+}
+
+/* Scroll animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animation classes */
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+/* Stagger delays for sequential animations */
+.animation-delay-100 {
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.animation-delay-300 {
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
+
+.animation-delay-500 {
+  animation-delay: 0.5s;
+  opacity: 0;
 }

@@ -3,8 +3,11 @@ import { MobileMenu } from "./mobile-menu"
 
 export const Header = () => {
   return (
-    <div className="fixed z-50 pt-8 md:pt-14 top-0 left-0 w-full">
-      <header className="flex items-center justify-between container">
+    <div className="fixed z-50 top-0 left-0 w-full">
+      {/* Backdrop blur overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-md border-b border-foreground/5" />
+      
+      <header className="relative flex items-center justify-between container pt-8 md:pt-14 pb-6">
         <Link href="/" className="flex items-center gap-3">
           <img src="/brand/spacelink-logo.jpg" alt="SpaceLink logo" className="h-8 w-auto" />
           <span className="font-mono uppercase tracking-widest text-foreground">SpaceLink</span>

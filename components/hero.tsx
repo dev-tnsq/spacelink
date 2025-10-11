@@ -6,18 +6,18 @@ import { Button } from "./ui/button"
 
 export function Hero() {
   return (
-    <div className="relative z-10 flex flex-col h-svh justify-center items-center">
+    <div className="relative z-10 flex flex-col h-svh justify-center items-center pt-20 md:pt-24">
       {/* Content */}
       <div className="text-center container max-w-4xl px-4">
-        <Pill className="mb-5 font-mono tracking-widest uppercase text-xs">
+        <Pill className="mb-2 font-mono tracking-widest uppercase text-xs">
           DePIN • Creditcoin
         </Pill>
 
-        <h1 className="text-balance font-sans font-bold tracking-tight leading-tight drop-shadow-2xl text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-3 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
+        <h1 className="text-balance font-sans font-bold tracking-tight leading-tight drop-shadow-2xl text-2xl sm:text-4xl md:text-5xl lg:text-6xl mb-2 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
           SpaceLink
         </h1>
 
-        <h2 className="text-balance font-sans font-normal text-base sm:text-lg md:text-xl text-foreground/70 mb-8 leading-relaxed max-w-2xl mx-auto">
+        <h2 className="text-balance font-sans font-normal text-sm sm:text-base md:text-lg text-foreground/70 mb-6 leading-relaxed max-w-2xl mx-auto">
           Decentralized ground station network
         </h2>
 

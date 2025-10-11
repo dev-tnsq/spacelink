@@ -1,6 +1,10 @@
 "use client"
 
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
+
 export function HowItWorks() {
+  const { ref, isVisible } = useScrollAnimation()
+  
   const forOperators = [
     {
       number: "01",
@@ -44,9 +48,9 @@ export function HowItWorks() {
   ]
 
   return (
-    <section id="how-it-works" className="relative z-10 py-20 md:py-28 bg-gradient-to-b from-transparent via-background/50 to-transparent">
+    <section id="how-it-works" ref={ref} className="relative z-10 py-20 md:py-28 bg-gradient-to-b from-transparent via-background/50 to-transparent">
       <div className="container max-w-7xl">
-        <div className="text-center mb-14">
+        <div className={`text-center mb-14 ${isVisible ? 'animate-fade-in-up' : 'opacity-0'}`}>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-foreground">
             How It Works
           </h2>
@@ -57,13 +61,13 @@ export function HowItWorks() {
 
         <div className="grid md:grid-cols-2 gap-12 mb-12">
           {/* For Satellite Operators */}
-          <div>
+          <div className={`${isVisible ? 'animate-slide-in-left' : 'opacity-0'} animation-delay-200`}>
             <h3 className="text-xl font-semibold text-foreground mb-6 text-center">
               For Satellite Operators
             </h3>
             <div className="space-y-6">
               {forOperators.map((step, index) => (
-                <div key={index} className="relative bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-5">
+                <div key={index} className="relative bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-5 hover:border-primary/30 transition-all">
                   <div className="flex gap-4">
                     <span className="text-4xl font-bold text-primary/30 shrink-0">
                       {step.number}
@@ -86,13 +90,13 @@ export function HowItWorks() {
           </div>
 
           {/* For Ground Station Owners */}
-          <div>
+          <div className={`${isVisible ? 'animate-slide-in-right' : 'opacity-0'} animation-delay-300`}>
             <h3 className="text-xl font-semibold text-foreground mb-6 text-center">
               For Ground Station Owners
             </h3>
             <div className="space-y-6">
               {forNodes.map((step, index) => (
-                <div key={index} className="relative bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-5">
+                <div key={index} className="relative bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-5 hover:border-primary/30 transition-all">
                   <div className="flex gap-4">
                     <span className="text-4xl font-bold text-primary/30 shrink-0">
                       {step.number}
@@ -115,13 +119,15 @@ export function HowItWorks() {
           </div>
         </div>
 
-        <div className="text-center bg-background/60 backdrop-blur-md border border-foreground/10 rounded-lg p-6">
+        <div className={`text-center bg-background/60 backdrop-blur-md border border-foreground/10 rounded-lg p-6 ${
+          isVisible ? 'animate-fade-in-up' : 'opacity-0'
+        } animation-delay-400`}>
           <h4 className="text-lg font-semibold text-foreground mb-2">The Marketplace</h4>
           <p className="text-sm text-foreground/60 mb-4 max-w-2xl mx-auto">
             Connects registered satellites with available ground stations using orbital predictions. 
             Automated matching, verified relays, and instant payment.
           </p>
-          <button className="px-8 py-3 bg-primary text-background font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-lg">
+          <button className="px-8 py-3 bg-primary text-background font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-lg hover:scale-105 transition-transform">
             Explore Marketplace
           </button>
         </div>

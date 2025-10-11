@@ -1,6 +1,10 @@
 "use client"
 
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
+
 export function TechStack() {
+  const { ref, isVisible } = useScrollAnimation()
+  
   const technologies = [
     {
       name: "Creditcoin",
@@ -41,9 +45,9 @@ export function TechStack() {
   ]
 
   return (
-    <section id="tech-stack" className="relative z-10 py-20 md:py-28">
+    <section id="tech-stack" ref={ref} className="relative z-10 py-20 md:py-28">
       <div className="container max-w-7xl">
-        <div className="text-center mb-14">
+        <div className={`text-center mb-14 ${isVisible ? 'animate-fade-in-up' : 'opacity-0'}`}>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-foreground">
             Technology Stack
           </h2>
@@ -56,7 +60,9 @@ export function TechStack() {
           {technologies.map((tech, index) => (
             <div
               key={index}
-              className="group relative overflow-hidden bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-6 hover:border-primary/50 transition-all"
+              className={`group relative overflow-hidden bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-6 hover:border-primary/50 transition-all hover:scale-105 ${
+                isVisible ? 'animate-fade-in-up' : 'opacity-0'
+              } animation-delay-${Math.min(index + 1, 5) * 100}`}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${tech.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
               

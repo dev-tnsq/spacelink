@@ -1,6 +1,10 @@
 "use client"
 
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
+
 export function Features() {
+  const { ref, isVisible } = useScrollAnimation()
+  
   const features = [
     {
       title: "Global Network",
@@ -8,7 +12,7 @@ export function Features() {
     },
     {
       title: "Lower Costs",
-      description: "Pay around 1 CTC per pass instead of thousands of dollars charged by centralized providers."
+      description: "Pay around 100 CTC per pass instead of thousands of dollars charged by centralized providers."
     },
     {
       title: "Cross-Chain Payments",
@@ -29,9 +33,9 @@ export function Features() {
   ]
 
   return (
-    <section id="features" className="relative z-10 py-20 md:py-28">
+    <section id="features" ref={ref} className="relative z-10 py-20 md:py-28">
       <div className="container max-w-7xl">
-        <div className="text-center mb-14">
+        <div className={`text-center mb-14 ${isVisible ? 'animate-fade-in-up' : 'opacity-0'}`}>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-foreground">
             Why SpaceLink
           </h2>
@@ -44,7 +48,9 @@ export function Features() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-6 hover:border-primary/50 transition-all"
+              className={`bg-background/40 backdrop-blur-sm border border-foreground/10 rounded-lg p-6 hover:border-primary/50 transition-all ${
+                isVisible ? 'animate-fade-in-up' : 'opacity-0'
+              } animation-delay-${Math.min(index + 1, 5) * 100}`}
             >
               <h3 className="text-lg font-semibold mb-2 text-foreground">
                 {feature.title}
