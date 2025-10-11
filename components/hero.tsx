@@ -1,4 +1,4 @@
-"use client"
+    "use client"
 
 import Link from "next/link"
 import { Pill } from "./pill"
@@ -9,7 +9,7 @@ export function Hero() {
     <div className="relative z-10 flex flex-col h-svh justify-center items-center pt-20 md:pt-24">
       {/* Content */}
       <div className="text-center container max-w-4xl px-4">
-        <Pill className="mb-2 font-mono tracking-widest uppercase text-xs">
+        <Pill className="mb-6 font-mono tracking-widest uppercase text-xs">
           DePIN • Creditcoin
         </Pill>
 
@@ -34,7 +34,7 @@ export function Hero() {
           </Link>
           <Link href="/#register" className="contents">
             <Button
-              variant="outline"
+              variant="default"
               className="px-7 py-3 text-sm border-foreground/30 text-foreground/70 hover:text-foreground hover:border-primary/50 bg-background/20 backdrop-blur-sm w-full sm:w-auto transition-all"
             >
               Register Node
