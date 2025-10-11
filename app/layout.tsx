@@ -19,7 +19,8 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "SpaceLink",
   description:
-    "Decentralized satellite-to-ground relay marketplace on Creditcoin. Book affordable 5–10 minute passes from community nodes, settle via USCs and on-chain credit, verified by Chainlink, stored on Walrus.",
+    "SPACELINK IS A DECENTRALIZED GROUND STATION NETWORK ON CREDITCOIN, SLASHING SATELLITE RELAY COSTS. IT LINKS OPERATORS WITH GLOBAL ANTENNA OWNERS FOR RELIABLE DATA TRANSFERS. NODE OWNERS EARN CTC AND CREDIT, BRIDGING THE $200B UNBANKED GAP IN ASIA. PAY PER USE, VERIFIED BY CHAINLINK, STORED ON WALRUS.",
+ASIA. PAY PER USE, VERIFIED BY CHAINLINK, STORED ON WALRUS.",
   generator: "v0.app",
 }
 
