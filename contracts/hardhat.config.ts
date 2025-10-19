@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "dotenv/config";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -14,7 +15,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     creditcoinTestnet: {
-      url: "https://rpc.testnet.creditcoin.org:8545",
+      url: "https://rpc.cc3-testnet.creditcoin.network",
       chainId: 102031,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },

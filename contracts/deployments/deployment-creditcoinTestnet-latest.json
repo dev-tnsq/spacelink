@@ -1,0 +1,17 @@
+{
+  "priceOracleAggregator": "0x92b8619B268BcD074c3502d4AFa4d816e7f710a4",
+  "tokenRegistry": "0xAB320FC7B3B53967ED67e6bB141C179D80d1e0e6",
+  "oracleAggregator": "0xB56c32C53ffdDEF7d4544683a91cCCdf5C4fAb98",
+  "paymentRouter": "0xbd6737Ec181c402243B700DEE28FBd48f425758f",
+  "ipfsAdapter": "0xD7fcF6cf23b00829Fd64F1956Ad0227a11DB0A01",
+  "creditcoinCreditAdapter": "0xc1fD511958459DeF65445124e702a2Ff3537f090",
+  "marketplace": "0x34d7C9F312d77D6afaaD9fc69fcc1a3Ee8BA2E22",
+  "rewards": "0xf3e2Cd25CF851c4BB07eA6193F548DC00b20CA7e",
+  "bnplLoanManager": "0xDe7D65F7Bc65c9abbcC28c6503e0eC8eD8eD72f0",
+  "liquidStaking": "0x50A31b5e077cf6CE41ABBc703f22B5A794414824",
+  "passExchange": "0x4eb908db04863EEd67d4119574b0559081964e1E",
+  "networkName": "unknown",
+  "chainId": 102031,
+  "deployer": "0xE161F2f194Aa401afD838015CF58F0e6E141a2FF",
+  "deployedAt": "2025-10-20T00:05:00.000Z"
+}

@@ -35,6 +35,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@gluwa/creditcoin-public-prover": "^3.65.0-devnet",
     "@nomicfoundation/hardhat-ignition": "^3.0.3",
     "dotenv": "^17.2.3"
   }

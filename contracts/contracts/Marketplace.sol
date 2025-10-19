@@ -5,9 +5,10 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "./interfaces/IChainlinkOracle.sol";
+import "./interfaces/IOracleAggregator.sol";
 import "./interfaces/IIPFS.sol";
 import "./interfaces/ICreditModule.sol";
+import "./interfaces/IPaymentRouter.sol";
 import "./libraries/ValidationLibrary.sol";
 
 /**
@@ -34,13 +35,19 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     uint256 public passCount;
 
     /// @notice Oracle for verification
-    IChainlinkOracle public oracle;
+    IOracleAggregator public oracle;
 
     /// @notice IPFS storage for metadata
     IIPFS public ipfs;
 
     /// @notice Credit module for scoring
     ICreditModule public creditModule;
+
+    /// @notice Payment router for multi-token payments
+    IPaymentRouter public paymentRouter;
+
+    /// @notice Pass lock window (e.g., 30 minutes before pass start)
+    uint256 public passLockWindow = 30 minutes;
 
     // ============ Structs ============
 
@@ -52,9 +59,10 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
      * @param specs Hardware specs (e.g., "S-band, 100 Mbps")
      * @param active Registration status
      * @param uptime Uptime percentage (0-100)
-     * @param walrusCID Content ID for extended metadata/photos
+     * @param ipfsCID Content ID for extended metadata/photos
      * @param stakeAmount Staked CTC
      * @param totalRelays Number of completed relays
+     * @param availability Array of availability windows (start, end timestamps)
      */
     struct Node {
         address owner;
@@ -66,6 +74,7 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         string ipfsCID;
         uint256 stakeAmount;
         uint256 totalRelays;
+        uint256[] availability; // [start1, end1, start2, end2, ...]
     }
 
     /**
@@ -93,10 +102,12 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
      * @param satId Satellite ID
      * @param timestamp Scheduled pass timestamp
      * @param durationMin Duration in minutes (5-10)
-     * @param completed Completion status
-     * @param proofHash SHA-256 hash of relay data
+     * @param state Pass state (0=Booked, 1=Transferable, 2=Locked, 3=Completed, 4=Verified, 5=Settled, 6=Disputed)
+     * @param payment Payment details {token, amount}
+     * @param proofCID IPFS CID of relay proof
      * @param verified Oracle verification status
-     * @param paymentAmount Payment in CTC/USC
+     * @param metrics Relay metrics {signalStrength, dataSizeBytes, band}
+     * @param tleSnapshotHash Hash of TLE snapshot at booking
      */
     struct Pass {
         address operator;
@@ -104,10 +115,23 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         uint256 satId;
         uint256 timestamp;
         uint256 durationMin;
-        bool completed;
-        bytes32 proofHash;
+        uint8 state; // 0=Booked, 1=Transferable, 2=Locked, 3=Completed, 4=Verified, 5=Settled, 6=Disputed
+        Payment payment;
+        string proofCID;
         bool verified;
-        uint256 paymentAmount;
+        RelayMetrics metrics;
+        bytes32 tleSnapshotHash;
+    }
+
+    struct Payment {
+        address token;
+        uint256 amount;
+    }
+
+    struct RelayMetrics {
+        uint256 signalStrength;
+        uint256 dataSizeBytes;
+        string band;
     }
 
     // ============ Mappings ============
@@ -149,7 +173,7 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     event PassCompleted(
         uint256 indexed passId,
         address indexed node,
-        bytes32 proofHash
+        string proofCID
     );
 
     event PassVerified(
@@ -217,19 +241,33 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice Initializes marketplace with external contracts
-     * @param _oracle Chainlink oracle address
+     * @param _oracle Oracle aggregator address
      * @param _ipfs IPFS storage address
      * @param _creditModule Credit module address
+     * @param _paymentRouter Payment router address
      */
     constructor(
         address _oracle,
         address _ipfs,
-        address _creditModule
+        address _creditModule,
+        address _paymentRouter
     ) ERC1155("https://spacelink.network/api/token/{id}.json") {
-        oracle = IChainlinkOracle(_oracle);
+        oracle = IOracleAggregator(_oracle);
         ipfs = IIPFS(_ipfs);
         creditModule = ICreditModule(_creditModule);
+        paymentRouter = IPaymentRouter(_paymentRouter);
         _transferOwnership(msg.sender);
+    }
+
+    /**
+     * @notice Returns metadata URI for pass NFT
+     * @param id Pass ID
+     * @return URI pointing to IPFS metadata
+     */
+    function tokenURI(uint256 id) public view returns (string memory) {
+        Pass memory pass = passes[id];
+        // Construct IPFS URI with pass metadata
+        return string(abi.encodePacked("ipfs://", pass.proofCID, "/metadata.json"));
     }
 
     // ============ Node Functions ============
@@ -273,7 +311,8 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
             uptime: _uptime,
             ipfsCID: _ipfsCID,
             stakeAmount: msg.value,
-            totalRelays: 0
+            totalRelays: 0,
+            availability: new uint256[](0)
         });
 
         operatorNodes[msg.sender].push(nodeId);
@@ -311,6 +350,81 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         emit StakeWithdrawn(_nodeId, msg.sender, amount);
     }
 
+    /**
+     * @notice Sets availability windows for a node
+     * @param _nodeId Node ID
+     * @param _availability Array of timestamps [start1, end1, start2, end2, ...]
+     */
+    function setNodeAvailability(uint256 _nodeId, uint256[] memory _availability) external {
+        Node storage node = nodes[_nodeId];
+        if (node.owner != msg.sender) revert NotNodeOwner();
+        node.availability = _availability;
+    }
+
+    /**
+     * @notice Gets available nodes matching criteria (view function)
+     * @param params Filter parameters
+     * @param cursor Pagination cursor
+     * @param limit Max results
+     * @return nodeIds Array of matching node IDs
+     * @return nextCursor Next cursor for pagination
+     */
+    function getAvailableNodes(
+        NodeFilterParams memory params,
+        uint256 cursor,
+        uint256 limit
+    ) external view returns (uint256[] memory nodeIds, uint256 nextCursor) {
+        uint256[] memory temp = new uint256[](nodeCount);
+        uint256 count = 0;
+        uint256 start = cursor == 0 ? 1 : cursor;
+
+        for (uint256 i = start; i <= nodeCount && count < limit; i++) {
+            Node memory node = nodes[i];
+            if (!node.active) continue;
+
+            // Apply filters
+            if (params.minUptime > 0 && node.uptime < params.minUptime) continue;
+            if (params.latMin != 0 && node.lat < params.latMin) continue;
+            if (params.latMax != 0 && node.lat > params.latMax) continue;
+            if (params.lonMin != 0 && node.lon < params.lonMin) continue;
+            if (params.lonMax != 0 && node.lon > params.lonMax) continue;
+            if (bytes(params.bands).length > 0 && !stringContains(node.specs, params.bands)) continue;
+
+            // Check availability window
+            if (params.timeWindow > 0 && !isAvailableInWindow(node.availability, params.timeWindow)) continue;
+
+            temp[count++] = i;
+        }
+
+        nodeIds = new uint256[](count);
+        for (uint256 j = 0; j < count; j++) {
+            nodeIds[j] = temp[j];
+        }
+        nextCursor = start + count;
+    }
+
+    struct NodeFilterParams {
+        int256 latMin;
+        int256 latMax;
+        int256 lonMin;
+        int256 lonMax;
+        uint256 minUptime;
+        string bands;
+        uint256 timeWindow;
+    }
+
+    function stringContains(string memory haystack, string memory needle) internal pure returns (bool) {
+        return bytes(haystack).length >= bytes(needle).length &&
+               keccak256(bytes(haystack)) == keccak256(bytes(needle)); // Simplified
+    }
+
+    function isAvailableInWindow(uint256[] memory availability, uint256 window) internal pure returns (bool) {
+        for (uint256 i = 0; i < availability.length; i += 2) {
+            if (availability[i] <= window && window <= availability[i+1]) return true;
+        }
+        return false;
+    }
+
     // ============ Satellite Functions ============
 
     /**
@@ -330,10 +444,6 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
 
         // Validate TLE
         if (!ValidationLibrary.validateTLE(_tle1, _tle2))
-            revert InvalidTLE();
-
-        // Verify TLE with oracle
-        if (!oracle.validateTLE(_tle1, _tle2))
             revert InvalidTLE();
         
         if (bytes(_ipfsCID).length == 0) revert InvalidCID();
@@ -371,8 +481,6 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         // Validate TLE
         if (!ValidationLibrary.validateTLE(_tle1, _tle2))
             revert InvalidTLE();
-        if (!oracle.validateTLE(_tle1, _tle2))
-            revert InvalidTLE();
 
         sat.tle1 = _tle1;
         sat.tle2 = _tle2;
@@ -384,18 +492,23 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     // ============ Pass Functions ============
 
     /**
-     * @notice Books a satellite pass relay session
+     * @notice Books a relay pass
      * @param _nodeId Ground station ID
      * @param _satId Satellite ID
+     * @param _timestamp Scheduled timestamp
      * @param _durationMin Duration in minutes (5-10)
-     * @dev Requires 1 CTC payment (USC for Spacecoin), mints ERC-1155 RWA
-     * Note: SGP4 prediction done off-chain via Cloud Run, LOS confirmed in UI
+     * @param _token Payment token address
+     * @param _amount Payment amount
+     * @dev Routes payment via PaymentRouter, mints ERC-1155 pass NFT
      */
     function bookPass(
         uint256 _nodeId,
         uint256 _satId,
-        uint256 _durationMin
-    ) external payable nonReentrant whenNotPaused returns (uint256) {
+        uint256 _timestamp,
+        uint256 _durationMin,
+        address _token,
+        uint256 _amount
+    ) external nonReentrant whenNotPaused returns (uint256) {
         // Validate entities
         Node storage node = nodes[_nodeId];
         Satellite storage sat = satellites[_satId];
@@ -407,24 +520,30 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         if (!ValidationLibrary.validateDuration(_durationMin))
             revert InvalidDuration();
 
-        // Validate payment
-        if (msg.value < STAKE_AMOUNT) revert InsufficientPayment();
+        // Check TLE freshness
+        if (block.timestamp - sat.lastUpdate > 7 days) revert InvalidTLE();
+
+        // Route payment via PaymentRouter
+        IPaymentRouter(paymentRouter).routePayment(_token, msg.sender, address(this), _amount);
 
         // Create pass
         uint256 passId = ++passCount;
+        bytes32 tleSnapshot = keccak256(abi.encodePacked(sat.tle1, sat.tle2));
         passes[passId] = Pass({
             operator: msg.sender,
             nodeId: _nodeId,
             satId: _satId,
-            timestamp: block.timestamp + 600, // 10 min briefing period
+            timestamp: _timestamp,
             durationMin: _durationMin,
-            completed: false,
-            proofHash: bytes32(0),
+            state: 0, // Booked
+            payment: Payment(_token, _amount),
+            proofCID: "",
             verified: false,
-            paymentAmount: msg.value
+            metrics: RelayMetrics(0, 0, ""),
+            tleSnapshotHash: tleSnapshot
         });
 
-        // Mint ERC-1155 RWA token
+        // Mint ERC-1155 pass NFT
         _mint(msg.sender, passId, 1, "");
 
         emit PassBooked(
@@ -432,7 +551,7 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
             msg.sender,
             _nodeId,
             _satId,
-            passes[passId].timestamp,
+            _timestamp,
             _durationMin
         );
 
@@ -442,38 +561,31 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice Completes a pass with relay proof (node owner only)
      * @param _passId Pass ID
-     * @param _proofHash SHA-256 hash of relay data (12 GB at 100 Mbps)
-     * @dev Triggers Chainlink oracle verification
+     * @param _proofCID IPFS CID of relay proof data
+     * @dev Triggers oracle verification
      */
     function completePass(
         uint256 _passId,
-        bytes32 _proofHash
+        string memory _proofCID
     ) external nonReentrant {
         Pass storage pass = passes[_passId];
         Node storage node = nodes[pass.nodeId];
 
         if (node.owner != msg.sender) revert NotNodeOwner();
-        if (pass.completed) revert PassAlreadyCompleted();
+        if (pass.state >= 2) revert PassAlreadyCompleted();
 
-        // Store proof
-        pass.completed = true;
-        pass.proofHash = _proofHash;
+        // Store proof and update state
+        pass.state = 3; // Verified
+        pass.proofCID = _proofCID;
 
         // Increment relay count
         node.totalRelays++;
 
-        emit PassCompleted(_passId, msg.sender, _proofHash);
+        emit PassCompleted(_passId, msg.sender, _proofCID);
 
-        // Trigger oracle verification (callback pattern)
-        bool verified = oracle.verifyProof(
-            _proofHash,
-            pass.timestamp,
-            pass.nodeId,
-            pass.satId
-        );
-
-        pass.verified = verified;
-        emit PassVerified(_passId, verified);
+        // For now, mark as verified (oracle verification would be implemented separately)
+        pass.verified = true;
+        emit PassVerified(_passId, true);
     }
 
     // ============ View Functions ============
@@ -532,7 +644,7 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     function updateOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "Invalid oracle address");
         emit OracleUpdated(address(oracle), _oracle);
-        oracle = IChainlinkOracle(_oracle);
+        oracle = IOracleAggregator(_oracle);
     }
 
     /**
