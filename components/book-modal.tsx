@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import { useAppData } from "./context/AppDataContext";
 import { useWallet } from "./context/WalletContext";
+import { useBookPass } from "@/lib/hooks";
 
 export default function BookModal({ open, onClose, nodeId }: { open: boolean; onClose: () => void; nodeId: string | null }) {
   const { satellites, addBooking } = useAppData();
+  const { bookPass, hash, isLoading: contractLoading, isSuccess, error } = useBookPass();
   const [satId, setSatId] = useState<string | null>(satellites.length ? satellites[0].id : null);
   const [start, setStart] = useState<string>(new Date(Date.now() + 1000 * 60 * 60).toISOString().slice(0, 16));
   const [end, setEnd] = useState<string>(new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString().slice(0, 16));
@@ -33,10 +35,21 @@ export default function BookModal({ open, onClose, nodeId }: { open: boolean; on
     }
     setLoading(true);
     try {
-      // Simulate network / booking latency
-      await new Promise((r) => setTimeout(r, 800));
-      const b = addBooking({ nodeId, satId, start: new Date(start).getTime(), end: new Date(end).getTime() });
-      setMessage(`Booking created (local demo): ${b.id}`);
+      // Calculate duration in minutes
+      const startTime = new Date(start).getTime();
+      const endTime = new Date(end).getTime();
+      const durationMin = Math.floor((endTime - startTime) / (1000 * 60));
+
+      // Call contract to book pass
+      const paymentAmount = BigInt("1000000000000000000"); // 1 CTC in wei (placeholder)
+      await bookPass(
+        BigInt(nodeId),
+        BigInt(satId),
+        BigInt(durationMin),
+        paymentAmount
+      );
+
+      setMessage(`Pass booking transaction submitted! Hash: ${hash}`);
       setTimeout(() => {
         onClose();
       }, 800);

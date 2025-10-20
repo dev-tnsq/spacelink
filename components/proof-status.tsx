@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react";
+import { useCompletePass } from "@/lib/hooks";
 
 export default function ProofStatus() {
   const [proofHash, setProofHash] = useState<string>("");
@@ -8,13 +9,22 @@ export default function ProofStatus() {
   const [nodeId, setNodeId] = useState<string>("");
   const [satId, setSatId] = useState<string>("");
   const [computedHash, setComputedHash] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Contract integration
+  const [passId, setPassId] = useState<string>("");
+  const [signalStrength, setSignalStrength] = useState<string>("");
+  const [dataSizeBytes, setDataSizeBytes] = useState<string>("");
+  const [band, setBand] = useState<string>("UHF");
+  const [tleSnapshotHash, setTleSnapshotHash] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+    const { completePass, isPending, isConfirmed, isError, error, txHash } = useCompletePass();
 
   async function compute() {
-    setError(null);
+    setLocalError(null);
     setComputedHash(null);
     if (!proofHash) {
-      setError("Enter proof text or hex and click Compute");
+      setLocalError("Enter proof text or hex and click Compute");
       return;
     }
 
@@ -31,7 +41,32 @@ export default function ProofStatus() {
       const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
       setComputedHash("0x" + hex);
     } catch (err: any) {
-      setError(String(err?.message || err));
+      setLocalError(String(err?.message || err));
+    }
+  }
+
+  async function submitProof() {
+    setLocalError(null);
+    if (!passId || !computedHash || !signalStrength || !dataSizeBytes || !tleSnapshotHash) {
+      setLocalError("Please fill all required fields for proof submission");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await completePass(
+        BigInt(passId),
+        computedHash, // This should be the IPFS CID of the proof
+        BigInt(signalStrength),
+        BigInt(dataSizeBytes),
+        band,
+        tleSnapshotHash as `0x${string}`
+      );
+      setLocalError(null);
+    } catch (err: any) {
+      setLocalError(String(err?.message || err));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -57,17 +92,70 @@ export default function ProofStatus() {
         </div>
       </div>
 
+      {computedHash && (
+        <>
+          <h4 className="text-sm font-semibold mb-3">Submit Proof to Contract</h4>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs text-foreground/60">Pass ID</label>
+              <input value={passId} onChange={(e) => setPassId(e.target.value)} className="w-full p-2 rounded-md mb-1 bg-background/30" placeholder="pass id" />
+            </div>
+            <div>
+              <label className="text-xs text-foreground/60">Signal Strength (dB)</label>
+              <input value={signalStrength} onChange={(e) => setSignalStrength(e.target.value)} className="w-full p-2 rounded-md mb-1 bg-background/30" placeholder="-50" />
+            </div>
+            <div>
+              <label className="text-xs text-foreground/60">Data Size (bytes)</label>
+              <input value={dataSizeBytes} onChange={(e) => setDataSizeBytes(e.target.value)} className="w-full p-2 rounded-md mb-1 bg-background/30" placeholder="1024" />
+            </div>
+            <div>
+              <label className="text-xs text-foreground/60">Band</label>
+              <select value={band} onChange={(e) => setBand(e.target.value)} className="w-full p-2 rounded-md mb-1 bg-background/30">
+                <option>UHF</option>
+                <option>VHF</option>
+                <option>L-band</option>
+                <option>S-band</option>
+                <option>X-band</option>
+              </select>
+            </div>
+          </div>
+          <div className="mb-3">
+            <label className="text-xs text-foreground/60">TLE Snapshot Hash</label>
+            <input value={tleSnapshotHash} onChange={(e) => setTleSnapshotHash(e.target.value)} className="w-full p-2 rounded-md mb-1 bg-background/30" placeholder="0x..." />
+          </div>
+        </>
+      )}
+
       <div className="flex gap-3">
         <button onClick={compute} className="px-4 py-2 bg-primary text-white rounded-md">Compute SHA-256</button>
+        {computedHash && (
+          <button onClick={submitProof} disabled={submitting || isPending} className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-60">
+            {submitting || isPending ? 'Submitting…' : 'Submit Proof'}
+          </button>
+        )}
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {localError && <p className="mt-3 text-sm text-red-400">{localError}</p>}
 
       {computedHash && (
         <div className="mt-4 p-3 bg-background/20 border border-foreground/5 rounded-md">
           <strong className="block">Computed bytes32</strong>
           <p className="text-sm text-foreground/70 break-words">{computedHash}</p>
-          <p className="text-xs text-foreground/50 mt-2">This is a UI-only computation. To check a proof against an on-chain oracle you will need to enable contract integration and a provider; that will be added in the integration phase.</p>
+          <p className="text-xs text-foreground/50 mt-2">This is the SHA-256 hash for your proof data. Use this as the IPFS CID when submitting proof completion.</p>
+        </div>
+      )}
+
+      {isConfirmed && txHash && (
+        <div className="mt-4 p-3 bg-green-600/20 border border-green-600/30 rounded-md">
+          <strong className="block text-green-400">Proof Submitted Successfully!</strong>
+          <p className="text-sm text-green-300 break-words">Transaction: {txHash}</p>
+        </div>
+      )}
+
+      {isError && error && (
+        <div className="mt-4 p-3 bg-red-600/20 border border-red-600/30 rounded-md">
+          <strong className="block text-red-400">Proof Submission Failed</strong>
+          <p className="text-sm text-red-300">{error.message || 'An error occurred while submitting the proof.'}</p>
         </div>
       )}
 

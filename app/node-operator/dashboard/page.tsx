@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { useAppData } from "@/components/context/AppDataContext";
 import { useWallet } from "@/components/context/WalletContext";
+import { useCompletePass } from "@/lib/hooks";
 import CesiumGlobe from "@/components/cesium-globe";
 import WalletButton from '@/components/wallet-button';
 
 export default function NodeDashboardPage() {
-  const { nodes, updateNode } = useAppData();
+  const { nodes, bookings } = useAppData();
   const { address, connect } = useWallet();
 
   const myNodes = useMemo(() => nodes.filter((n) => (address ? n.owner === address : n.owner === null)), [nodes, address]);
@@ -95,33 +96,90 @@ export default function NodeDashboardPage() {
         </div>
       </div>
 
-          {/* bookings inline */}
+          {/* passes inline */}
           <div className="bg-[#232534] border border-[#2b2f3a] rounded-lg p-4 mt-4">
-            <div className="text-sm text-slate-200 font-medium mb-2">Bookings</div>
+            <div className="text-sm text-slate-200 font-medium mb-2">My Passes</div>
             <div className="space-y-3">
-              {/** useAppData provides bookings */}
-              <BookingsList />
+              <NodePassesList nodes={nodes} />
             </div>
           </div>
     </div>
   );
 }
 
-    function BookingsList() {
-      const { bookings, updateBooking } = useAppData() as any;
-      if (!bookings || bookings.length === 0) return <div className="text-slate-400">No bookings yet.</div>;
+    function NodePassesList({ nodes }: { nodes: any[] }) {
+      const { bookings } = useAppData() as any;
+      const { address } = useWallet();
+      const { completePass, isPending, isConfirmed } = useCompletePass();
+
+      // Filter passes to show only those for this node's operator
+      const myNodeIds = nodes.filter((n: any) => n.owner === address).map((n: any) => n.id);
+      const myPasses = bookings.filter((p: any) => myNodeIds.includes(p.nodeId));
+
+      const getStatusText = (state: number) => {
+        switch (state) {
+          case 0: return 'Booked';
+          case 1: return 'Transferable';
+          case 2: return 'Locked';
+          case 3: return 'Completed';
+          case 4: return 'Verified';
+          case 5: return 'Settled';
+          case 6: return 'Cancelled';
+          default: return 'Unknown';
+        }
+      };
+
+      const getStatusColor = (state: number) => {
+        switch (state) {
+          case 0: return 'bg-yellow-600 text-black';
+          case 1: return 'bg-blue-600 text-white';
+          case 2: return 'bg-orange-600 text-white';
+          case 3: return 'bg-purple-600 text-white';
+          case 4: return 'bg-green-600 text-white';
+          case 5: return 'bg-gray-600 text-white';
+          case 6: return 'bg-red-600 text-white';
+          default: return 'bg-gray-500 text-white';
+        }
+      };
+
+      async function handleComplete(passId: string, proofCID: string) {
+        try {
+          await completePass(
+            BigInt(passId),
+            proofCID,
+            BigInt(0), // signalStrength
+            BigInt(0), // dataSizeBytes
+            'UHF', // band
+            '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}` // tleSnapshotHash
+          );
+        } catch (error) {
+          console.error('Failed to complete pass:', error);
+        }
+      }
+
+      if (!myPasses || myPasses.length === 0) return <div className="text-slate-400">No passes yet.</div>;
       return (
         <div className="space-y-2">
-          {bookings.map((b: any) => (
-            <div key={b.id} className="flex items-center justify-between bg-[#1f2229] p-3 rounded">
+          {myPasses.map((pass: any) => (
+            <div key={pass.id} className="flex items-center justify-between bg-[#1f2229] p-3 rounded">
               <div>
-                <div className="text-sm text-slate-200">{b.id}</div>
-                <div className="text-xs text-slate-400">Node: {b.nodeId} • Sat: {b.satId}</div>
+                <div className="text-sm text-slate-200">Pass #{pass.id}</div>
+                <div className="text-xs text-slate-400">Satellite: {pass.satId} • Duration: {pass.durationMin} min</div>
+                <div className="text-xs text-slate-400">Payment: {pass.payment?.amount || 'N/A'} CTC</div>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`px-2 py-1 rounded text-sm ${b.status === 'confirmed' ? 'bg-green-600 text-white' : b.status === 'completed' ? 'bg-blue-600 text-white' : 'bg-yellow-600 text-black'}`}>{b.status}</div>
-                <button onClick={() => updateBooking(b.id, { status: 'confirmed' })} className="px-3 py-1 rounded bg-slate-700 text-white">Confirm</button>
-                <button onClick={() => updateBooking(b.id, { status: 'cancelled' })} className="px-3 py-1 rounded bg-red-700 text-white">Cancel</button>
+                <div className={`px-2 py-1 rounded text-sm ${getStatusColor(pass.state)}`}>
+                  {getStatusText(pass.state)}
+                </div>
+                {pass.state >= 1 && pass.state < 3 && ( // Show complete button for transferable/locked passes
+                  <button
+                    onClick={() => handleComplete(pass.id, pass.proofCID || 'test-proof-cid')}
+                    disabled={isPending}
+                    className="px-3 py-1 rounded bg-green-600 text-white disabled:opacity-50"
+                  >
+                    {isPending ? 'Completing...' : 'Complete'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
