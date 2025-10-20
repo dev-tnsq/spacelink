@@ -52,6 +52,7 @@ export default function SatelliteDashboardPage() {
           </div>
         </div>
 
+
         <div className="lg:col-span-2">
           <div className="bg-[#232534] border border-[#2b2f3a] rounded-lg overflow-hidden">
            
