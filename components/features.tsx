@@ -28,7 +28,7 @@ export function Features() {
     },
     {
       title: "Verified Relays",
-      description: "Chainlink oracles verify every data relay, while Walrus provides permanent, tamper-proof storage of all transaction records."
+      description: "SpaceLink verifies relays on-chain using TLE checks plus an optimistic 24-hour dispute window; Walrus stores relay records permanently and tamper-proof."
     }
   ]
 

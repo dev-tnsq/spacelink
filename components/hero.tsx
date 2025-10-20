@@ -27,12 +27,12 @@ export function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
-          <Link href="/#marketplace" className="contents">
+          <Link href="/marketplace" className="contents">
             <Button className="px-7 py-3 text-sm shadow-lg hover:shadow-primary/30 transition-all w-full sm:w-auto">
               Browse Marketplace
             </Button>
           </Link>
-          <Link href="/#register" className="contents">
+          <Link href="/node-operator/register" className="contents">
             <Button
               variant="default"
               className="px-7 py-3 text-sm border-foreground/30 text-foreground/70 hover:text-foreground hover:border-primary/50 bg-background/20 backdrop-blur-sm w-full sm:w-auto transition-all"
@@ -43,7 +43,7 @@ export function Hero() {
         </div>
         
         <div className="text-xs text-foreground/40 mb-12">
-          or <Link href="/#register-satellite" className="underline hover:text-primary">register your satellite</Link>
+          or <Link href="/satellite-operator/register" className="underline hover:text-primary">register your satellite</Link>
         </div>
 
         {/* Scroll indicator */}

@@ -40,9 +40,9 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --background: #0b0b0f; /* deep navy black */
+  --foreground: #e6eef8; /* soft off-white */
+  --card: #13141a; /* card background */
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);

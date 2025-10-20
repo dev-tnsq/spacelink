@@ -1,5 +1,7 @@
-'use client'
+"use client"
 
+import { Header } from "@/components/header"
+import { EarthBackground } from "@/components/earth-background";
 import { Hero } from "@/components/hero";
 import { Features } from "@/components/features";
 import { Stats } from "@/components/stats";
@@ -11,6 +13,8 @@ import { Leva } from "leva";
 export default function Home() {
   return (
     <>
+      <Header />
+      <EarthBackground />
       <Hero />
       <Features />
       <Stats />

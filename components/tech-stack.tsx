@@ -13,8 +13,8 @@ export function TechStack() {
       color: "from-blue-500/20 to-cyan-500/20"
     },
     {
-      name: "Chainlink",
-      description: "Verifies relay proofs through decentralized oracles, ensuring data accuracy without central control.",
+      name: "SpaceLink Verification",
+      description: "On-chain TLE validation plus optimistic verification with a 24-hour dispute window — cheap, fast, and compatible with Creditcoin.",
       category: "Oracle",
       color: "from-purple-500/20 to-pink-500/20"
     },
@@ -85,7 +85,7 @@ export function TechStack() {
 
         <div className="mt-10 text-center">
           <p className="text-xs text-foreground/50 font-mono">
-            Running on Creditcoin Testnet • Chain ID: 102031 • Solidity 0.8.20
+            Running on Creditcoin Testnet • Chain ID: 102031 • Solidity 0.8.20 • SimpleOracleAdapter
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@ export function Footer() {
 
   const links = {
     product: [
-      { name: "Marketplace", href: "#marketplace" },
+      { name: "Marketplace", href: "/marketplace" },
       { name: "Network", href: "#network" },
       { name: "Documentation", href: "#docs" },
       { name: "Whitepaper", href: "#whitepaper" }
@@ -44,11 +44,17 @@ export function Footer() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button className="px-8 py-3 bg-primary text-background font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-lg w-full sm:w-auto">
+              <Link href="/marketplace">
                 Launch Marketplace
+                 
+                </Link>
               </button>
               <button className="px-8 py-3 bg-transparent border-2 border-foreground/30 text-foreground font-medium rounded-lg hover:border-primary/50 hover:bg-background/40 transition-colors w-full sm:w-auto">
-                Register Your Node
+              <Link href="/node-operator/register">Register Your Node</Link>
               </button>
+                <Link href="/proof-checker" className="inline-block px-8 py-3 bg-transparent border-2 border-foreground/30 text-foreground font-medium rounded-lg hover:border-primary/50 hover:bg-background/40 transition-colors w-full sm:w-auto text-center">
+                  Proof Checker
+                </Link>
             </div>
             
             <div className="mt-8 pt-6 border-t border-foreground/10">

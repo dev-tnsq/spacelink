@@ -1,5 +1,9 @@
 import Link from "next/link"
 import { MobileMenu } from "./mobile-menu"
+// Wallet connect (client component)
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import WalletButton from "./wallet-button"
 
 export const Header = () => {
   return (
@@ -16,21 +20,21 @@ export const Header = () => {
         <nav className="flex max-lg:hidden absolute left-1/2 -translate-x-1/2 items-center justify-center gap-x-8">
           <Link
             className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
-            href="#marketplace"
+            href="/satellite-operator"
+          >
+            Satellite Operator
+          </Link>
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="/node-operator"
+          >
+            Node Operator
+          </Link>
+          <Link
+            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
+            href="/marketplace"
           >
             Marketplace
-          </Link>
-          <Link
-            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
-            href="#register-satellite"
-          >
-            Register Satellite
-          </Link>
-          <Link
-            className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
-            href="#register-node"
-          >
-            Register Node
           </Link>
           <Link
             className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
@@ -40,12 +44,12 @@ export const Header = () => {
           </Link>
         </nav>
 
-        <Link
-          className="uppercase max-lg:hidden transition-colors ease-out duration-150 font-mono text-primary hover:text-primary/80"
-          href="/#launch"
-        >
-          Launch App
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* Wallet connect button */}
+          {/* @ts-ignore - client component */}
+          <WalletButton />
+          {/* no CTA here — simplified header */}
+        </div>
         <MobileMenu />
       </header>
     </div>

@@ -14,9 +14,9 @@ export const MobileMenu = ({ className }: MobileMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
-    { name: "Marketplace", href: "#marketplace" },
-    { name: "Register Satellite", href: "#register-satellite" },
-    { name: "Register Node", href: "#register-node" },
+    { name: "Satellite Operator", href: "/satellite-operator" },
+    { name: "Node Operator", href: "/node-operator" },
+    { name: "Marketplace", href: "/marketplace" },
     { name: "Docs", href: "#docs" },
   ];
 
@@ -70,15 +70,7 @@ export const MobileMenu = ({ className }: MobileMenuProps) => {
               </Link>
             ))}
 
-            <div className="mt-6">
-              <Link
-                href="/#launch"
-                onClick={handleLinkClick}
-                className="inline-block text-xl font-mono uppercase text-primary transition-colors ease-out duration-150 hover:text-primary/80 py-2"
-              >
-                Launch App
-              </Link>
-            </div>
+            {/* simplified mobile menu; no CTA */}
           </nav>
         </Dialog.Content>
       </Dialog.Portal>
