@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAppData } from "./context/AppDataContext";
 import { useWallet } from "./context/WalletContext";
+import { useRegisterSatellite } from "@/lib/hooks";
 import WalletButton from './wallet-button';
 
 const MARKETPLACE_ABI = [
@@ -27,6 +28,7 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { addSatellite } = useAppData();
+  const { registerSatellite, hash, isLoading: contractLoading, isSuccess, error } = useRegisterSatellite();
   const { address, connect, isOnPreferredChain, preferredChainId, switchToPreferredChain } = useWallet();
 
   function quickValidateTLE(l1: string, l2: string) {
@@ -82,15 +84,18 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
         return;
       }
 
-      // Simulate network latency / tx and then register in local in-memory store
-      await new Promise((r) => setTimeout(r, 900));
-  const sat = addSatellite({ tle1, tle2, ipfsCID, name });
-  setMessage(`Satellite registered: ${sat.id}`);
-  setSuccess(true);
-      // clear a few fields for convenience
+      // Call contract to register satellite
+      const stakeAmount = BigInt("1000000000000000000"); // 1 CTC in wei (placeholder - should get from contract)
+      await registerSatellite(tle1, tle2, ipfsCID || "", stakeAmount);
+
+      setMessage(`Satellite registration transaction submitted! Hash: ${hash}`);
+      setSuccess(true);
+
+      // Clear form fields
       setTle1("");
       setTle2("");
       setName("");
+      setIpfsCID("");
     } catch (err: any) {
       setMessage(err?.message || String(err));
     } finally {

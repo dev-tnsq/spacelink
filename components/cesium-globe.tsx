@@ -46,6 +46,11 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
   const orbitDurationMinutes = globeOptions?.orbitDurationMinutes ?? 90;
   const orbitSampleSeconds = globeOptions?.orbitSampleSeconds ?? 30;
   const { nodes, satellites } = useAppData();
+  const nodesRef = useRef(nodes);
+  const satellitesRef = useRef(satellites);
+
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { satellitesRef.current = satellites; }, [satellites]);
 
   useEffect(() => {
     // Inject Cesium CSS if not already present
@@ -519,40 +524,82 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
           } catch (e) {}
         }
 
-        function refreshAll() {
-          // Remove any entities we created that are no longer in the dataset
-          // Keep base entity ids plus the derived visualization ids we create
-          const idsToKeep = new Set([
-            ...nodes.map((n: any) => n.id),
-            ...satellites.map((s: any) => s.id),
-            ...satellites.map((s: any) => `${s.id}_orbit`),
-            ...satellites.map((s: any) => `${s.id}_groundtrack`),
-            ...nodes.map((n: any) => `${n.id}_coverage`),
-          ]);
-          viewer.entities.values.slice().forEach((ent: any) => {
-            if (ent.id && typeof ent.id === "string" && !idsToKeep.has(ent.id)) {
-              viewer.entities.remove(ent);
-            }
-          });
+        // function refreshAll() {
+        //   // Remove any entities we created that are no longer in the dataset
+        //   // Keep base entity ids plus the derived visualization ids we create
+        //   const idsToKeep = new Set([
+        //     ...nodes.map((n: any) => n.id),
+        //     ...satellites.map((s: any) => s.id),
+        //     ...satellites.map((s: any) => `${s.id}_orbit`),
+        //     ...satellites.map((s: any) => `${s.id}_groundtrack`),
+        //     ...nodes.map((n: any) => `${n.id}_coverage`),
+        //   ]);
+        //   viewer.entities.values.slice().forEach((ent: any) => {
+        //     if (ent.id && typeof ent.id === "string" && !idsToKeep.has(ent.id)) {
+        //       viewer.entities.remove(ent);
+        //     }
+        //   });
 
-          // Add or update nodes (if requested)
-          if (renderMode === 'both' || renderMode === 'nodes') {
-            nodes.forEach((n: any) => addOrUpdateNode(n));
-          }
+        //   // Add or update nodes (if requested)
+        //   if (renderMode === 'both' || renderMode === 'nodes') {
+        //     nodes.forEach((n: any) => addOrUpdateNode(n));
+        //   }
 
-          // Add or update satellites (if requested)
-          if (renderMode === 'both' || renderMode === 'satellites') {
-            satellites.forEach((s: any) => addOrUpdateSat(s));
-          }
-        }
+        //   // Add or update satellites (if requested)
+        //   if (renderMode === 'both' || renderMode === 'satellites') {
+        //     satellites.forEach((s: any) => addOrUpdateSat(s));
+        //   }
+        // }
 
   // Initial refresh
+  function refreshAll() {
+    // Don't run if viewer isn't initialized
+    if (!viewer || !viewer.entities) return;
+    
+    // Use refs to get current values
+    const currentNodes = nodesRef.current;
+    const currentSatellites = satellitesRef.current;
+    
+    // Remove any entities we created that are no longer in the dataset
+    const idsToKeep = new Set([
+      ...currentNodes.map((n: any) => n.id),
+      ...currentSatellites.map((s: any) => s.id),
+      ...currentSatellites.map((s: any) => `${s.id}_orbit`),
+      ...currentSatellites.map((s: any) => `${s.id}_groundtrack`),
+      ...currentNodes.map((n: any) => `${n.id}_coverage`),
+    ]);
+    
+    try {
+      viewer.entities.values.slice().forEach((ent: any) => {
+        if (ent.id && typeof ent.id === "string" && !idsToKeep.has(ent.id)) {
+          viewer.entities.remove(ent);
+        }
+      });
+    } catch (e) {
+      console.warn('Error removing entities:', e);
+      return;
+    }
+
+    // Use currentNodes and currentSatellites instead of nodes and satellites
+    if (renderMode === 'both' || renderMode === 'nodes') {
+      currentNodes.forEach((n: any) => addOrUpdateNode(n));
+    }
+
+    if (renderMode === 'both' || renderMode === 'satellites') {
+      currentSatellites.forEach((s: any) => addOrUpdateSat(s));
+    }
+  }
   refreshAll();
-  setLoading(false);
+  setLoading(false);  
 
         // Refresh whenever the datasets change
-        const nodesTimer = setInterval(() => refreshAll(), 2500);
-
+      const nodesTimer = setInterval(() => {
+        try {
+          refreshAll();
+        } catch (e) {
+          console.warn('Error in refresh interval:', e);
+        }
+      }, 2500);
         // Allow clicking on entities to zoom and open info box
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
         handler.setInputAction(function (click: any) {
