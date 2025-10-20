@@ -431,8 +431,10 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
         }
 
         function addOrUpdateSat(s: any) {
+          console.log("1");
           createdIds.add(s.id);
           const existing = viewer.entities.getById(s.id);
+          console.log("2");
 
           // Use a CallbackProperty so Cesium can update position over time
     const positionCallback = new Cesium.CallbackProperty((time: any) => {
@@ -470,6 +472,8 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
             });
           }
           // Orbit path (static sample for next N minutes)
+          console.log("3");
+
           try {
             const orbitId = `${s.id}_orbit`;
             const showOrbit = showOrbitsRef.current;
@@ -485,18 +489,24 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
                 if (!p) continue;
                 positions.push(Cesium.Cartesian3.fromDegrees(p.lon, p.lat, Math.max(p.height, 200000)));
               }
-              const existingOrbit = viewer.entities.getById(orbitId);
-              if (existingOrbit) {
-                existingOrbit.polyline.positions = positions;
-                existingOrbit.show = true;
-              } else {
-                viewer.entities.add({ id: orbitId, polyline: { positions, width: 1.5, material: Cesium.Color.YELLOW.withAlpha(0.6), clampToGround: false } });
-                createdIds.add(orbitId);
+              if (positions.length >= 2) {
+
+                const existingOrbit = viewer.entities.getById(orbitId);
+                if (existingOrbit) {
+                  existingOrbit.polyline.positions = positions;
+                  existingOrbit.show = true;
+                } else {
+                  viewer.entities.add({ id: orbitId, polyline: { positions, width: 1.5, material: Cesium.Color.YELLOW.withAlpha(0.6), clampToGround: false } });
+                  createdIds.add(orbitId);
+                }
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn('Error creating orbit path:', e);
+          }
 
           // Ground track projection
+          console.log("4");
           try {
             const groundId = `${s.id}_groundtrack`;
             const showGT = showGroundTracksRef.current;
@@ -512,16 +522,21 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
                 if (!p) continue;
                 positions2.push(Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 1000));
               }
-              const existingGT = viewer.entities.getById(groundId);
-              if (existingGT) {
-                existingGT.polyline.positions = positions2;
-                existingGT.show = true;
-              } else {
-                viewer.entities.add({ id: groundId, polyline: { positions: positions2, width: 2, material: Cesium.Color.CYAN.withAlpha(0.5), clampToGround: false } });
-                createdIds.add(groundId);
+              if (positions2.length >= 2) {
+
+                const existingGT = viewer.entities.getById(groundId);
+                if (existingGT) {
+                  existingGT.polyline.positions = positions2;
+                  existingGT.show = true;
+                } else {
+                  viewer.entities.add({ id: groundId, polyline: { positions: positions2, width: 2, material: Cesium.Color.CYAN.withAlpha(0.5), clampToGround: false } });
+                  createdIds.add(groundId);
+                }
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn('Error creating ground track:', e);
+          }
         }
 
         // function refreshAll() {
@@ -582,10 +597,12 @@ export default function CesiumGlobe({ className, onSelect, globeOptions, dataMod
 
     // Use currentNodes and currentSatellites instead of nodes and satellites
     if (renderMode === 'both' || renderMode === 'nodes') {
+      console.log("Nodes",renderMode);
       currentNodes.forEach((n: any) => addOrUpdateNode(n));
     }
 
     if (renderMode === 'both' || renderMode === 'satellites') {
+      console.log("Satellites",renderMode);
       currentSatellites.forEach((s: any) => addOrUpdateSat(s));
     }
   }

@@ -285,19 +285,28 @@ export function useRegisterNode() {
       console.log('Calling registerNode with:', { lat, lon, specs, uptime, ipfsCID, value: value.toString() })
       
       // Check if the contract is paused
+      let isPaused: boolean;
       try {
-        const isPaused = await publicClient.readContract({
+        isPaused = await publicClient.readContract({
           address: CONTRACT_ADDRESSES.marketplace as Address,
           abi: MARKETPLACE_ABI,
           functionName: 'paused',
         }) as boolean
-        console.log('Contract paused status:', isPaused)
-        
-        if (isPaused) {
-          throw new Error('Contract is currently paused')
-        }
+        console.log('Contract paused status:', isPaused);
       } catch (pausedError) {
         console.log('Could not check paused status:', pausedError)
+        throw new Error('Could not verify contract status. Please try again.')
+      }
+      
+      if (isPaused) {
+        throw new Error('Contract is currently paused')
+      }
+
+      // Check balance
+      const balance = await publicClient.getBalance({ address: walletClient.account.address })
+      console.log('Wallet balance:', balance.toString(), 'Required stake:', value.toString())
+      if (balance < value) {
+        throw new Error(`Insufficient balance. You have ${balance} wei, but need ${value} wei for stake.`)
       }
       
       const txHash = await walletClient.writeContract({
@@ -338,26 +347,83 @@ export function useRegisterNode() {
 }
 
 export function useRegisterSatellite() {
-  const [hash, setHash] = useState<`0x${string}` | null>(null)
   const [isPending, setIsPending] = useState(false)
   const [isError, setIsError] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
-  const registerSatellite = async (tle1: string, tle2: string, ipfsCID: string, value: bigint) => {
+  const registerSatellite = async (walletClient: any, tle1: string, tle2: string, ipfsCID: string, value: bigint) => {
+    if (!walletClient) {
+      throw new Error('Wallet not connected')
+    }
+
     setIsPending(true)
     setIsError(false)
     setError(null)
+
     try {
-      console.log('Register satellite:', { tle1, tle2, ipfsCID, value })
+      // Check if wallet is on the correct chain
+      const currentChainId = await walletClient.getChainId()
+      const expectedChainId = 102031 // Creditcoin Testnet
+
+      if (currentChainId !== expectedChainId) {
+        throw new Error(`Please switch your wallet to Creditcoin Testnet (Chain ID: ${expectedChainId}). Current chain: ${currentChainId}`)
+      }
+
+      console.log('Calling registerSatellite with:', { tle1: tle1.length, tle2: tle2.length, ipfsCID, value: value.toString() })
+      console.log('TLE1 starts with:', tle1.substring(0, 5))
+      console.log('TLE2 starts with:', tle2.substring(0, 5))
+      
+      // Check if the contract is paused
+      try {
+        const isPaused = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.marketplace as Address,
+          abi: MARKETPLACE_ABI,
+          functionName: 'paused',
+        }) as boolean
+        console.log('Contract paused status:', isPaused)
+        
+        if (isPaused) {
+          throw new Error('Contract is currently paused')
+        }
+      } catch (pausedError) {
+        console.log('Could not check paused status:', pausedError)
+      }
+      
+      const txHash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESSES.marketplace as Address,
+        abi: MARKETPLACE_ABI,
+        functionName: 'registerSatellite',
+        args: [tle1, tle2, ipfsCID],
+        value: value,
+        chain: CREDITCOIN_TESTNET,
+      })
+      
+      console.log('Transaction hash:', txHash)
+      
+      // Wait for transaction confirmation
+      const receipt = await publicClient.waitForTransactionReceipt({ 
+        hash: txHash 
+      })
+      
+      console.log('Transaction receipt:', receipt)
+      
+      if (receipt.status === 'reverted') {
+        console.error('Transaction reverted. Receipt:', receipt)
+        throw new Error('Transaction reverted - satellite registration failed. Check that you have enough CTC balance and all fields are valid.')
+      }
+      
+      console.log('Satellite registration successful!')
+      return txHash
     } catch (err) {
       setIsError(true)
       setError(err as Error)
+      throw err
     } finally {
       setIsPending(false)
     }
   }
 
-  return { registerSatellite, hash, isPending, isError, error }
+  return { registerSatellite, isPending, isError, error }
 }
 
 export function useBookPass() {
@@ -716,10 +782,10 @@ export async function fetchAllSatellites() {
           abi: MARKETPLACE_ABI,
           functionName: 'getSatellite',
           args: [i],
-        }) as any[]
+        }) as any
 
         if (satData) {
-          const [tle1, tle2, ipfsCID, owner, lastUpdate, active] = satData
+          const { owner, tle1, tle2, active, lastUpdate, ipfsCID } = satData
           satellites.push({
             id: i.toString(),
             name: `Satellite ${i}`,

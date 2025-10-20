@@ -120,62 +120,74 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { data: passCount } = usePassCount();
 
   // Fetch contract data on mount and when counts change
-  // useEffect(() => {
-  //   let mounted = true;
-  //   const loadContractData = async () => {
-  //     if (!mounted) return; // Add this check
+// useEffect(() => {
+//   let mounted = true;
+//   let timeoutId: NodeJS.Timeout;
+  
+//   const loadContractData = async () => {
+//     if (!mounted) return;
+    
+//     try {
+//       console.log('Loading contract data... nodeCount:', nodeCount, 'satelliteCount:', satelliteCount, 'passCount:', passCount);
+      
+//       // Skip if counts aren't loaded yet
+//       if (nodeCount === null || satelliteCount === null || passCount === null) {
+//         return;
+//       }
+      
+//       // Fetch nodes from contract
+//       const contractNodes = await fetchAllNodes();
+//       console.log('Contract nodes fetched:', contractNodes);
+      
+//       if (!mounted) return;
+      
+//       if (contractNodes.length > 0) {
+//         setNodes(prevNodes => {
+//           // console.log('Previous nodes:', prevNodes);
+//           const mockNodes = prevNodes.filter(node => !node.id.match(/^\d+$/));
+//           // console.log('Mock nodes:', mockNodes);
+//           const allNodes = [...mockNodes, ...contractNodes];
+//           // console.log('All nodes after merge:', allNodes);
+//           return allNodes;
+//         });
+//       }
 
-  //     try {
-  //       console.log('Loading contract data... nodeCount:', nodeCount, 'satelliteCount:', satelliteCount, 'passCount:', passCount);
-        
-  //       // Fetch nodes from contract
-  //       const contractNodes = await fetchAllNodes();
-  //       console.log('Contract nodes fetched:', contractNodes);
-  //       if (!mounted) return; // Add this check before setState
+//       if (!mounted) return;
+      
+//       // Fetch satellites from contract
+//       const contractSatellites = await fetchAllSatellites();
+//       if (contractSatellites.length > 0) {
+//         setSatellites(prevSats => {
+//           const mockSats = prevSats.filter(sat => !sat.id.match(/^\d+$/));
+//           console.log('All satellites after merge:', [...mockSats, ...contractSatellites]);
 
-  //       if (contractNodes.length > 0) {
-  //         // Merge contract nodes with mock data, keeping both
-  //         setNodes(prevNodes => {
-  //           console.log('Previous nodes:', prevNodes);
-  //           // Create a map of existing mock nodes (those without numeric IDs)
-  //           const mockNodes = prevNodes.filter(node => !node.id.match(/^\d+$/));
-  //           console.log('Mock nodes:', mockNodes);
-  //           // Combine mock nodes with contract nodes, avoiding duplicates
-  //           const allNodes = [...mockNodes, ...contractNodes];
-  //           console.log('All nodes after merge:', allNodes);
-  //           return allNodes;
-  //         });
-  //       } else {
-  //         console.log('No contract nodes found, keeping mock data only');
-  //       }
-  //       if (!mounted) return; // Add check before satellites
+//           return [...mockSats, ...contractSatellites];
+//         });
+//       }
 
-  //       // Fetch satellites from contract
-  //       const contractSatellites = await fetchAllSatellites();
-  //       if (contractSatellites.length > 0) {
-  //         setSatellites(prevSats => {
-  //           const mockSats = prevSats.filter(sat => !sat.id.match(/^\d+$/));
-  //           return [...mockSats, ...contractSatellites];
-  //         });
-  //       }
-  //       if (!mounted) return; // Add check before passes
+//       if (!mounted) return;
+      
+//       // Fetch passes (bookings) from contract
+//       const contractPasses = await fetchAllPasses();
+//       if (contractPasses.length > 0) {
+//         setBookings(contractPasses);
+//       }
+//     } catch (error) {
+//       console.error('Error loading contract data:', error);
+//     }
+//   };
 
-  //       // Fetch passes (bookings) from contract
-  //       const contractPasses = await fetchAllPasses();
-  //       if (contractPasses.length > 0) {
-  //         setBookings(contractPasses);
-  //       }
-  //     } catch (error) {
-  //       console.error('Error loading contract data:', error);
-  //       // Fall back to mock data if contract calls fail
-  //     }
-  //   };
-
-  //   loadContractData();
-  //   return () => { mounted = false; }; // Add cleanup
-
-  // }, [nodeCount, satelliteCount, passCount]);
-  // Fetch contract data on mount and when counts change
+//   // Debounce to prevent multiple rapid calls
+//   timeoutId = setTimeout(() => {
+//     loadContractData();
+//   }, 100);
+  
+//   return () => {
+//     mounted = false;
+//     clearTimeout(timeoutId);
+//   };
+// }, [nodeCount, satelliteCount, passCount]);
+// Fetch contract data on mount and when counts change
 useEffect(() => {
   let mounted = true;
   let timeoutId: NodeJS.Timeout;
@@ -191,38 +203,35 @@ useEffect(() => {
         return;
       }
       
-      // Fetch nodes from contract
+      // Fetch ALL data first, then update state ONCE at the end
       const contractNodes = await fetchAllNodes();
       console.log('Contract nodes fetched:', contractNodes);
       
+      const contractSatellites = await fetchAllSatellites();
+      console.log('Contract satellites fetched:', contractSatellites);
+      
+      const contractPasses = await fetchAllPasses();
+      console.log('Contract passes fetched:', contractPasses);
+      
       if (!mounted) return;
       
+      // Now do ALL state updates together
       if (contractNodes.length > 0) {
         setNodes(prevNodes => {
-          console.log('Previous nodes:', prevNodes);
           const mockNodes = prevNodes.filter(node => !node.id.match(/^\d+$/));
-          console.log('Mock nodes:', mockNodes);
-          const allNodes = [...mockNodes, ...contractNodes];
-          console.log('All nodes after merge:', allNodes);
-          return allNodes;
+          return [...mockNodes, ...contractNodes];
         });
       }
 
-      if (!mounted) return;
-      
-      // Fetch satellites from contract
-      const contractSatellites = await fetchAllSatellites();
       if (contractSatellites.length > 0) {
         setSatellites(prevSats => {
           const mockSats = prevSats.filter(sat => !sat.id.match(/^\d+$/));
-          return [...mockSats, ...contractSatellites];
+          const merged = [...mockSats, ...contractSatellites];
+          console.log('All satellites after merge:', merged);
+          return merged;
         });
       }
 
-      if (!mounted) return;
-      
-      // Fetch passes (bookings) from contract
-      const contractPasses = await fetchAllPasses();
       if (contractPasses.length > 0) {
         setBookings(contractPasses);
       }
@@ -241,7 +250,7 @@ useEffect(() => {
     clearTimeout(timeoutId);
   };
 }, [nodeCount, satelliteCount, passCount]);
-  function addNode(n: Omit<NodeRecord, "id" | "owner">) {
+function addNode(n: Omit<NodeRecord, "id" | "owner">) {
     const newNode: NodeRecord = {
       id: randomId("node"),
       owner: address ?? null,
