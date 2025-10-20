@@ -26,7 +26,7 @@ export const Header = () => {
           </Link>
           <Link
             className="uppercase inline-block font-mono text-foreground/60 hover:text-foreground/100 duration-150 transition-colors ease-out"
-            href="/node-operator"
+            href="/node-operator/register"
           >
             Node Operator
           </Link>
