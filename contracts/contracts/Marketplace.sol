@@ -351,14 +351,42 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Sets availability windows for a node
-     * @param _nodeId Node ID
-     * @param _availability Array of timestamps [start1, end1, start2, end2, ...]
+     * @notice Updates node parameters (owner only)
+     * @param _nodeId Node ID to update
+     * @param _lat New latitude
+     * @param _lon New longitude
+     * @param _specs New hardware specifications
+     * @param _uptime New uptime percentage
+     * @param _ipfsCID New IPFS CID for metadata
      */
-    function setNodeAvailability(uint256 _nodeId, uint256[] memory _availability) external {
+    function updateNode(
+        uint256 _nodeId,
+        int256 _lat,
+        int256 _lon,
+        string memory _specs,
+        uint256 _uptime,
+        string memory _ipfsCID
+    ) external nonReentrant {
         Node storage node = nodes[_nodeId];
         if (node.owner != msg.sender) revert NotNodeOwner();
-        node.availability = _availability;
+        if (!node.active) revert NodeNotActive();
+
+        // Validate inputs
+        if (!ValidationLibrary.validateCoordinates(_lat, _lon))
+            revert InvalidCoordinates();
+        if (!ValidationLibrary.validateSpecs(_specs))
+            revert InvalidSpecs();
+        if (!ValidationLibrary.validateUptime(_uptime))
+            revert InvalidUptime();
+        if (bytes(_ipfsCID).length == 0) revert InvalidCID();
+
+        node.lat = _lat;
+        node.lon = _lon;
+        node.specs = _specs;
+        node.uptime = _uptime;
+        node.ipfsCID = _ipfsCID;
+
+        emit NodeRegistered(_nodeId, msg.sender, _lat, _lon, _specs, _ipfsCID); // Reuse event
     }
 
     /**
@@ -489,6 +517,38 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
         emit SatelliteUpdated(_satId, _tle1, _tle2);
     }
 
+    /**
+     * @notice Updates satellite metadata (owner only)
+     * @param _satId Satellite ID to update
+     * @param _ipfsCID New IPFS CID for metadata
+     */
+    function updateSatellite(
+        uint256 _satId,
+        string memory _ipfsCID
+    ) external nonReentrant {
+        Satellite storage sat = satellites[_satId];
+        if (sat.owner != msg.sender) revert NotSatelliteOwner();
+        if (!sat.active) revert SatelliteNotActive();
+        if (bytes(_ipfsCID).length == 0) revert InvalidCID();
+
+        sat.ipfsCID = _ipfsCID;
+        sat.lastUpdate = block.timestamp;
+
+        emit SatelliteUpdated(_satId, sat.tle1, sat.tle2); // Reuse event
+    }
+
+    /**
+     * @notice Deactivates a satellite (owner only)
+     * @param _satId Satellite ID to deactivate
+     */
+    function deactivateSatellite(uint256 _satId) external nonReentrant {
+        Satellite storage sat = satellites[_satId];
+        if (sat.owner != msg.sender) revert NotSatelliteOwner();
+
+        sat.active = false;
+        emit NodeDeactivated(_satId, msg.sender); // Reuse event
+    }
+
     // ============ Pass Functions ============
 
     /**
@@ -559,24 +619,30 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Completes a pass with relay proof (node owner only)
+     * @notice Completes a pass with relay proof and metrics (node owner only)
      * @param _passId Pass ID
      * @param _proofCID IPFS CID of relay proof data
+     * @param _metrics Relay metrics (signal strength, data size, band)
+     * @param _tleSnapshotHash Hash of TLE snapshot for verification
      * @dev Triggers oracle verification
      */
     function completePass(
         uint256 _passId,
-        string memory _proofCID
+        string memory _proofCID,
+        RelayMetrics memory _metrics,
+        bytes32 _tleSnapshotHash
     ) external nonReentrant {
         Pass storage pass = passes[_passId];
         Node storage node = nodes[pass.nodeId];
 
         if (node.owner != msg.sender) revert NotNodeOwner();
-        if (pass.state >= 2) revert PassAlreadyCompleted();
+        if (pass.state >= 3) revert PassAlreadyCompleted();
 
-        // Store proof and update state
-        pass.state = 3; // Verified
+        // Store proof, metrics and update state
+        pass.state = 3; // Completed
         pass.proofCID = _proofCID;
+        pass.metrics = _metrics;
+        pass.tleSnapshotHash = _tleSnapshotHash;
 
         // Increment relay count
         node.totalRelays++;
@@ -585,7 +651,67 @@ contract Marketplace is ERC1155, Ownable, ReentrancyGuard, Pausable {
 
         // For now, mark as verified (oracle verification would be implemented separately)
         pass.verified = true;
+        pass.state = 4; // Verified
         emit PassVerified(_passId, true);
+    }
+
+    /**
+     * @notice Confirms a booked pass (satellite operator only)
+     * @param _passId Pass ID to confirm
+     * @dev Changes pass state from Booked (0) to Transferable (1)
+     */
+    function confirmPass(uint256 _passId) external nonReentrant {
+        Pass storage pass = passes[_passId];
+        if (pass.operator != msg.sender) revert NotSatelliteOwner();
+        if (pass.state != 0) revert("Pass not in booked state");
+
+        pass.state = 1; // Transferable
+        emit PassVerified(_passId, true); // Reuse event for confirmation
+    }
+
+    /**
+     * @notice Cancels a booked pass (either operator or node owner)
+     * @param _passId Pass ID to cancel
+     * @dev Can only cancel if pass is not locked or completed
+     */
+    function cancelPass(uint256 _passId) external nonReentrant {
+        Pass storage pass = passes[_passId];
+        Node storage node = nodes[pass.nodeId];
+
+        // Only operator or node owner can cancel
+        if (pass.operator != msg.sender && node.owner != msg.sender) {
+            revert("Not authorized to cancel");
+        }
+
+        // Cannot cancel if pass is locked, completed, or verified
+        if (pass.state >= 2) revert("Pass cannot be cancelled");
+
+        pass.state = 6; // Disputed/Cancelled
+
+        // Return payment to operator (simplified - in production would use payment router)
+        if (pass.payment.token == address(0)) {
+            // Native token
+            (bool success, ) = payable(pass.operator).call{value: pass.payment.amount}("");
+            require(success, "Native transfer failed");
+        } else {
+            // ERC20 token - would need approval, simplified for now
+            revert("ERC20 refunds not implemented");
+        }
+
+        emit PassVerified(_passId, false); // Reuse event for cancellation
+    }
+
+    /**
+     * @notice Gets the current status of a pass
+     * @param _passId Pass ID
+     * @return status Current pass state (0-6)
+     * @return isActive Whether pass is still active
+     */
+    function getPassStatus(uint256 _passId) external view returns (uint8 status, bool isActive) {
+        Pass memory pass = passes[_passId];
+        status = pass.state;
+        // Pass is active if not cancelled/disputed and not settled
+        isActive = pass.state < 5;
     }
 
     // ============ View Functions ============

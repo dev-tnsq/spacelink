@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      "@walletconnect/utils": path.resolve(__dirname, "shims/walletconnect-utils-compat.ts"),
+      "@walletconnect/utils": path.resolve(__dirname, "shims/walletconnect-utils-compat.js"),
     };
     return config;
   },
