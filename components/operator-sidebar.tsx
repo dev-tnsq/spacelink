@@ -40,9 +40,7 @@ export default function OperatorSidebar({ base = "/", title = "Operator" }: { ba
       <div className="h-full flex flex-col">
         <div className="px-4 py-6 border-b border-[#23262b]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-[#303449] flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-white" />
-            </div>
+            <img src="/brand/spacelink-logo.jpg" alt="SpaceLink logo" className="h-10 w-10 rounded-md" />
             <div className="text-lg font-medium">SpaceLink</div>
           </div>
         </div>
