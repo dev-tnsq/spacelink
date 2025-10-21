@@ -214,7 +214,7 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
           <div className="mb-4 p-3 bg-foreground/5 rounded-md">
             <p className="text-xs text-foreground/60 mb-1">Transaction Hash:</p>
             <a
-              href={`https://explorer.cc3-testnet.creditcoin.network/tx/${txHash}`}
+              href={`https://creditcoin.blockscout.com/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-primary hover:text-primary/80 break-all flex items-center gap-1"
