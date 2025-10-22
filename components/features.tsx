@@ -28,7 +28,7 @@ export function Features() {
     },
     {
       title: "Verified Relays",
-      description: "SpaceLink verifies relays on-chain using TLE checks plus an optimistic 24-hour dispute window; Walrus stores relay records permanently and tamper-proof."
+      description: "SpaceLink verifies relays on-chain using TLE checks plus an optimistic 24-hour dispute window; IPFS stores relay records off-chain in a durable, content-addressed way."
     }
   ]
 
