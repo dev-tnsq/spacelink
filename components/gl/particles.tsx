@@ -104,9 +104,9 @@ export function Particles({
       revealStartTime.current = currentTime;
     }
 
-    // Calculate reveal progress
-    const revealElapsed = currentTime - revealStartTime.current;
-    const revealProgress = Math.min(revealElapsed / revealDuration, 1.0);
+  // Calculate reveal progress (guard revealStartTime.current)
+  const revealElapsed = revealStartTime.current !== null ? currentTime - revealStartTime.current : 0;
+  const revealProgress = Math.min(revealElapsed / revealDuration, 1.0);
 
     // Ease out the reveal animation
     const easedProgress = 1 - Math.pow(1 - revealProgress, 3);

@@ -63,8 +63,7 @@ export default function MarketplacePage() {
                 <div className="mt-3">
                   {nodes.find((n:any) => n.id === selected) ? (
                     <div className="flex gap-3">
-                      <button onClick={() => setComingSoonMessage("Book Relay Pass - Coming soon...")} className="px-3 py-2 bg-primary text-white rounded text-sm">Book Relay Pass</button>
-                      <button onClick={() => setComingSoonMessage("Request More Info - Coming soon...")} className="px-3 py-2 bg-background border rounded text-sm">Request More Info</button>
+                      <button onClick={() => setBookingOpen(true)} className="px-3 py-2 bg-primary text-white rounded text-sm">Book Relay Pass</button>
                     </div>
                   ) : (
                     <div className="text-xs text-foreground/60">Select a ground station to book a pass. To schedule a pass you must select one of your satellites in the booking modal.</div>

@@ -1,3 +1,20 @@
+**IWalrus.sol:**
+✅ `upload(data)` - Returns CID for immutable storage
+✅ `download(cid)` - Retrieves data by CID
+**IIPFS.sol (storage adapter):**
+✅ `upload(data)` - Returns CID for immutable storage (IPFS)
+✅ `download(cid)` - Retrieves data by CID (via configured gateway)
+✅ `Node` - Ground station with lat/lon (scaled by 10000), specs, uptime, ipfsCID, stake
+✅ `Satellite` - Space asset with TLE1/TLE2, lastUpdate, ipfsCID
+✅ `registerNode(lat, lon, specs, uptime)` - 1 CTC stake, validates coords, uploads metadata to IPFS
+✅ `registerSatellite(tle1, tle2)` - 1 CTC stake, validates TLE via oracle (or local checks), uploads metadata to IPFS
+✅ Logs all rewards to IPFS for audit trail (off-chain immutable storage)
+| IPFS CID storage | ✅ | `ipfsCID` fields |
+5. ✅ **IPFS Integration** - Off-chain metadata (content-addressed) for scalability
+4. ✅ Interfaces - Chainlink (optional), IPFS, CreditModule abstractions
+5. ✅ **IPFS Integration** - Off-chain metadata for scalability
+- [ ] Replace mocks with Chainlink DON integration (optional)
+- [ ] Integrate IPFS SDK / gateway configuration (production storage)
 # 🚀 SpaceLink Smart Contracts - Complete Implementation
 
 ## ✅ What Has Been Built

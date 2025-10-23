@@ -19,8 +19,8 @@ export function TechStack() {
       color: "from-purple-500/20 to-pink-500/20"
     },
     {
-      name: "Walrus",
-      description: "Stores all network metadata and relay records permanently with content-addressed retrieval.",
+      name: "IPFS",
+      description: "Durable, content-addressed storage for metadata and relay records (configured via gateway/IPFS adapter).",
       category: "Storage",
       color: "from-green-500/20 to-emerald-500/20"
     },

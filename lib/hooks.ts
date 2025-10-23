@@ -432,22 +432,72 @@ export function useBookPass() {
   const [isError, setIsError] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
-  const bookPass = async (nodeId: bigint, satId: bigint, durationMin: bigint, value: bigint) => {
+  const bookPass = async (walletClient: any, nodeId: bigint, satId: bigint, timestamp: bigint, durationMin: bigint, token: `0x${string}`, value: bigint) => {
+    if (!walletClient) {
+      throw new Error('Wallet not connected')
+    }
+
     setIsPending(true)
     setIsError(false)
     setError(null)
+
     try {
-      console.log('Book pass:', { nodeId, satId, durationMin, value })
+      // Ensure on correct chain
+      const currentChainId = await walletClient.getChainId()
+      const expectedChainId = 102031 // Creditcoin Testnet
+      if (currentChainId !== expectedChainId) {
+        throw new Error(`Please switch your wallet to Creditcoin Testnet (Chain ID: ${expectedChainId}). Current chain: ${currentChainId}`)
+      }
+
+      // Check if contract is paused
+      let isPaused = false
+      try {
+        isPaused = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.marketplace as Address,
+          abi: MARKETPLACE_ABI,
+          functionName: 'paused',
+        }) as boolean
+      } catch (e) {
+        console.log('Could not determine paused state', e)
+      }
+      if (isPaused) throw new Error('Contract is currently paused')
+
+      // Check balance
+      const balance = await publicClient.getBalance({ address: walletClient.account.address })
+      if (balance < value) {
+        throw new Error(`Insufficient balance. You have ${balance} wei, but need ${value} wei for this booking.`)
+      }
+
+      const txHash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESSES.marketplace as Address,
+        abi: MARKETPLACE_ABI,
+        functionName: 'bookPass',
+        args: [nodeId, satId, timestamp, durationMin, token, value],
+  value: token === '0x0000000000000000000000000000000000000000' ? value : BigInt(0),
+        chain: CREDITCOIN_TESTNET,
+      })
+
+      setHash(txHash)
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (receipt.status === 'reverted') {
+        throw new Error('Transaction reverted - booking failed')
+      }
+
+      return txHash
     } catch (err) {
       setIsError(true)
       setError(err as Error)
+      throw err
     } finally {
       setIsPending(false)
     }
   }
 
-  return { bookPass, hash, isPending, isError, error }
+  const isSuccess = !isPending && !isError && Boolean(hash)
+  return { bookPass, hash, isPending, isError, error, isLoading: isPending, isSuccess, isConfirmed: isSuccess, txHash: hash }
 }
+
 
 export function useCompletePass() {
   const [hash, setHash] = useState<`0x${string}` | null>(null)
@@ -476,7 +526,8 @@ export function useCompletePass() {
     }
   }
 
-  return { completePass, hash, isPending, isError, error }
+  const isSuccessComplete = !isPending && !isError && Boolean(hash)
+  return { completePass, hash, isPending, isError, error, isLoading: isPending, isSuccess: isSuccessComplete, isConfirmed: isSuccessComplete, txHash: hash }
 }
 
 export function useConfirmPass() {
@@ -499,7 +550,8 @@ export function useConfirmPass() {
     }
   }
 
-  return { confirmPass, hash, isPending, isError, error }
+  const isSuccessConfirm = !isPending && !isError && Boolean(hash)
+  return { confirmPass, hash, isPending, isError, error, isLoading: isPending, isSuccess: isSuccessConfirm, isConfirmed: isSuccessConfirm, txHash: hash }
 }
 
 export function useCancelPass() {
@@ -522,7 +574,8 @@ export function useCancelPass() {
     }
   }
 
-  return { cancelPass, hash, isPending, isError, error }
+  const isSuccessCancel = !isPending && !isError && Boolean(hash)
+  return { cancelPass, hash, isPending, isError, error, isLoading: isPending, isSuccess: isSuccessCancel, isConfirmed: isSuccessCancel, txHash: hash }
 }
 
 export function useUpdateNode() {
@@ -827,14 +880,39 @@ export async function fetchAllPasses() {
         }) as any
 
         if (passData) {
+          const timestampNum = Number(passData.timestamp)
+          const durationMinNum = Number(passData.durationMin)
+          // map numeric state to status string
+          const stateNum = Number(passData.state)
+          let status: "pending" | "confirmed" | "completed" | "cancelled" = "pending"
+          switch (stateNum) {
+            case 0:
+              status = "pending"
+              break
+            case 1:
+              status = "confirmed"
+              break
+            case 2:
+              status = "completed"
+              break
+            case 3:
+              status = "cancelled"
+              break
+            default:
+              status = "pending"
+          }
+
           passes.push({
             id: i.toString(),
             operator: passData.operator,
             nodeId: passData.nodeId.toString(),
             satId: passData.satId.toString(),
-            timestamp: Number(passData.timestamp),
-            durationMin: Number(passData.durationMin),
-            state: Number(passData.state),
+            timestamp: timestampNum,
+            durationMin: durationMinNum,
+            start: timestampNum,
+            end: timestampNum + durationMinNum * 60,
+            state: stateNum,
+            status,
             payment: passData.payment ? {
               token: passData.payment.token,
               amount: passData.payment.amount.toString(),
@@ -857,5 +935,97 @@ export async function fetchAllPasses() {
   } catch (error) {
     console.error('Error fetching passes:', error)
     return []
+  }
+}
+
+// Fetch JSON metadata from IPFS via public gateway (simple helper)
+export async function fetchIpfsJson(cid: string) {
+  try {
+    if (!cid) return null
+    const url = cid.startsWith('http') ? cid : `https://ipfs.io/ipfs/${cid}`
+    const res = await fetch(url)
+    if (!res.ok) {
+      console.warn('Failed to fetch IPFS JSON:', res.status, res.statusText)
+      return null
+    }
+    const json = await res.json()
+    return json
+  } catch (err) {
+    console.error('Error fetching IPFS JSON:', err)
+    return null
+  }
+}
+
+// Helper: treat both zero-address and legacy native token sentinel as native
+export function isNativeToken(address?: string | null) {
+  if (!address) return true
+  const a = address.toLowerCase()
+  return a === '0x0000000000000000000000000000000000000000' || a === '0x0000000000000000000000000000000000000001'
+}
+
+// Get token decimals (native token falls back to chain config)
+export async function getTokenDecimals(tokenAddress: `0x${string}` | string | null) {
+  try {
+    if (!tokenAddress || isNativeToken(tokenAddress)) return CREDITCOIN_TESTNET.nativeCurrency.decimals
+    const result = await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: 'decimals',
+    }) as bigint
+    return Number(result)
+  } catch (err) {
+    console.warn('Could not fetch token decimals, default to 18', err)
+    return 18
+  }
+}
+
+export async function getTokenSymbol(tokenAddress: `0x${string}` | string | null) {
+  try {
+    if (!tokenAddress || isNativeToken(tokenAddress)) return CREDITCOIN_TESTNET.nativeCurrency.symbol
+    const result = await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: 'symbol',
+    }) as string
+    return result
+  } catch (err) {
+    console.warn('Could not fetch token symbol', err)
+    return 'TOKEN'
+  }
+}
+
+// Read ERC20 allowance (owner -> spender)
+export async function getErc20Allowance(tokenAddress: `0x${string}`, owner: `0x${string}`, spender: `0x${string}`) {
+  try {
+    const result = await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [owner, spender],
+    }) as bigint
+    return BigInt(result.toString())
+  } catch (err) {
+    console.error('Error reading ERC20 allowance:', err)
+    return BigInt(0)
+  }
+}
+
+// Approve ERC20 token for spender via wallet client
+export async function approveErc20(walletClient: any, tokenAddress: `0x${string}`, spender: `0x${string}`, amount: bigint) {
+  if (!walletClient) throw new Error('Wallet not connected')
+  try {
+    const txHash = await walletClient.writeContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [spender, amount],
+      chain: CREDITCOIN_TESTNET,
+    })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+    if (receipt.status === 'reverted') throw new Error('Approve transaction reverted')
+    return txHash
+  } catch (err) {
+    console.error('Error approving ERC20:', err)
+    throw err
   }
 }

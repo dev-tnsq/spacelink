@@ -3,6 +3,11 @@
  * 
  * This JavaScript code runs on Chainlink DON to verify satellite relay proofs.
  * It validates that a ground station actually communicated with a satellite.
+ * Chainlink Functions Source Code (reference) - Relay Proof Verification
+ *
+ * Reference code intended for Chainlink Functions/DON examples. Production
+ * storage and metadata are handled via IPFS; Chainlink integration is
+ * optional and this file serves as an illustrative verification helper.
  * 
  * Arguments expected:
  * - args[0]: Proof hash (bytes32 hex string)

@@ -51,6 +51,7 @@ export type BookingRecord = {
     band: string;
   };
   tleSnapshotHash?: string;
+  passId?: string;
 };
 
 type AppDataValue = {
@@ -63,7 +64,7 @@ type AppDataValue = {
   updateBooking: (id: string, patch: Partial<BookingRecord>) => void;
   updateNode: (id: string, patch: Partial<NodeRecord>) => void;
   updateSatellite: (id: string, patch: Partial<SatelliteRecord>) => void;
-  refreshData: () => Promise<void>;
+  refreshData: () => Promise<BookingRecord[]>;
 };
 
 const AppDataContext = createContext<AppDataValue | undefined>(undefined);
@@ -328,8 +329,10 @@ function addNode(n: Omit<NodeRecord, "id" | "owner">) {
       if (contractPasses.length > 0) {
         setBookings(contractPasses);
       }
+      return contractPasses
     } catch (error) {
       console.error('Error refreshing data:', error);
+      return []
     }
   }
 

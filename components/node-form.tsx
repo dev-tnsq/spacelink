@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useAppData } from "./context/AppDataContext";
 import { useWallet } from "./context/WalletContext";
 import { useRegisterNode } from "@/lib/hooks";
 import WalletButton from './wallet-button';
+import { uploadJsonToIpfs } from '@/lib/ipfs';
 
 const MARKETPLACE_ABI = [
   "function STAKE_AMOUNT() view returns (uint256)",
@@ -22,7 +23,13 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
   const [polarization, setPolarization] = useState<string>("RHCP");
   const [maxDataRate, setMaxDataRate] = useState<string>("");
   const [uptime, setUptime] = useState<number>(95);
+  const [priceCtc, setPriceCtc] = useState<string>("1"); // human-friendly CTC per minute
   const [ipfsCID, setIpfsCID] = useState<string>("");
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null as any);
+  const [showJsonInfoModal, setShowJsonInfoModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -93,6 +100,34 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
         return;
       }
 
+      // Prepare metadata JSON and upload to IPFS if no CID provided
+      let finalCid = ipfsCID;
+      if (!finalCid || finalCid.trim().length === 0) {
+        const metadata = {
+          name: stationName,
+          specs,
+          dishSize,
+          polarization,
+          maxDataRate,
+          uptime,
+          coordinates: { lat: scaledLat, lon: scaledLon },
+          pricePerMinute: "1000000000000000000", // default 1 CTC per minute in wei - can be edited by operator
+          paymentToken: process.env.NEXT_PUBLIC_CREDITCOIN_NATIVE_ADDRESS || '0x0000000000000000000000000000000000000001',
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          const cid = await uploadJsonToIpfs(metadata);
+          finalCid = cid;
+          setMessage(`Uploaded metadata to IPFS: ${cid}`);
+        } catch (err: any) {
+          console.error('IPFS upload failed', err);
+          setMessage('Failed to upload metadata to IPFS: ' + (err?.message || String(err)));
+          setLoading(false);
+          return;
+        }
+      }
+
       // Call contract to register node
       const stakeAmount = BigInt("1000000000000000000"); // 1 CTC in wei (placeholder - should get from contract)
       const specsString = `NAME:${stationName} | ${specs} • Dish ${dishSize}m • ${polarization} • ${maxDataRate} Mbps`.slice(0, 250); // Include station name in specs
@@ -102,7 +137,7 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
         BigInt(Math.floor(scaledLon!)),
         specsString,
         BigInt(Math.floor(uptime)),
-        ipfsCID || "QmDefaultNodeMetadata", // Provide default IPFS CID if empty
+        finalCid || "QmDefaultNodeMetadata",
         stakeAmount
       );
 
@@ -138,6 +173,71 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
     } finally {
       setLoading(false);
     }
+  }
+
+  // Handle drag & drop or file select of a JSON metadata file
+  async function handleFile(file: File) {
+    setMessage(null)
+    setUploadingFile(true)
+    try {
+      const text = await file.text()
+      let json
+      try {
+        json = JSON.parse(text)
+      } catch (err) {
+        setMessage('Invalid JSON file')
+        return
+      }
+
+      // show a small preview (first 400 chars)
+      setFilePreview(JSON.stringify(json, null, 2).slice(0, 400))
+
+      // If operator has entered a price, merge/override into JSON before upload
+      if (priceCtc && priceCtc.trim().length > 0) {
+        // convert CTC (decimal) to wei string
+        try {
+          const parts = priceCtc.trim().split('.')
+          const whole = parts[0] || '0'
+          const frac = parts[1] || ''
+          const fracPadded = (frac + '000000000000000000').slice(0, 18)
+          const weiStr = BigInt(whole) * BigInt(10 ** 18) + BigInt(fracPadded)
+          json.pricePerMinute = weiStr.toString()
+        } catch (e) {
+          // ignore conversion errors; backend will fallback to default
+        }
+      }
+
+      // upload JSON to IPFS via server
+      const cid = await uploadJsonToIpfs(json)
+      setIpfsCID(cid)
+      setUploadedFileName(file.name)
+      setMessage(`Uploaded file to IPFS: ${cid}`)
+    } catch (err: any) {
+      setMessage('Failed to upload file: ' + (err?.message || String(err)))
+    } finally {
+      setUploadingFile(false)
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+      setMessage('Please upload a .json file')
+      return
+    }
+    void handleFile(file)
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault()
+  }
+
+  function onFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    void handleFile(file)
   }
 
   return (
@@ -195,11 +295,62 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div>
+          <label className="text-sm text-foreground/60">Price per minute (CTC)</label>
+          <input value={priceCtc} onChange={(e) => setPriceCtc(e.target.value)} className="w-full p-3 rounded-lg mb-1 bg-background/30 border border-foreground/5" placeholder="e.g., 1 or 0.5" />
+          <div className="text-xs text-foreground/50">Set how many CTCs to charge per minute for this node. Will be converted to wei and stored in IPFS metadata.</div>
+        </div>
+      </div>
+
       <label className="text-sm text-foreground/60">Expected Uptime (%)</label>
       <input value={uptime} onChange={(e) => setUptime(Number(e.target.value))} type="number" min={0} max={100} className="w-full p-3 rounded-lg mb-3 bg-background/30 border border-foreground/5" />
 
-  <label className="text-sm text-foreground/60" htmlFor="ipfs">IPFS CID (optional)</label>
-  <input id="ipfs" value={ipfsCID} onChange={(e) => setIpfsCID(e.target.value)} className="w-full p-3 rounded-lg mb-3 bg-background/30 border border-foreground/5" placeholder="bafy..." />
+  <div className="flex items-center gap-2 mb-2">
+    <label className="text-sm text-foreground/60">Metadata JSON</label>
+    <button type="button" onClick={() => setShowJsonInfoModal(true)} className="text-foreground/50 hover:text-foreground/70">
+      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+    </button>
+    <div className="text-xs text-foreground/50">Drag & drop a metadata JSON file or choose a file to auto-upload to IPFS. Uploaded CID will be used when registering.</div>
+  </div>
+
+  <div
+    onDrop={onDrop}
+    onDragOver={onDragOver}
+    className="mt-2 mb-3 p-3 border-dashed border-2 rounded-md border-foreground/10 text-sm text-foreground/50"
+  >
+    <div className="flex items-center justify-between">
+      <div>Drag & drop a metadata JSON file here to auto-upload to IPFS, or</div>
+      <div>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="px-3 py-1 bg-background border rounded-md text-sm"
+        >
+          Choose File
+        </button>
+      </div>
+    </div>
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="application/json"
+      onChange={onFileInputChange}
+      className="hidden"
+    />
+
+    <div className="mt-2 text-xs text-foreground/50">
+      {uploadingFile ? 'Uploading file...' : uploadedFileName ? `Selected: ${uploadedFileName}` : 'No file selected'}
+    </div>
+
+    {filePreview && (
+      <pre className="mt-2 p-2 bg-background/5 rounded text-xs overflow-auto max-h-40 whitespace-pre-wrap">{filePreview}</pre>
+    )}
+  </div>
+
+  {ipfsCID && (
+    <div className="text-xs text-foreground/60 mb-3">Uploaded CID: <a className="text-primary" href={`https://ipfs.io/ipfs/${ipfsCID}`} target="_blank" rel="noreferrer">{ipfsCID}</a></div>
+  )}
 
     <div className="flex gap-3">
   <button type="submit" disabled={loading} className="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-60">{loading ? "Registering…" : "Save Station"}</button>
@@ -289,6 +440,33 @@ export default function NodeForm({ marketplaceAddress = process.env.NEXT_PUBLIC_
               >
                 Switch Network
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Metadata JSON format info modal */}
+      {showJsonInfoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-foreground/20 rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 className="text-lg font-semibold mb-3 text-foreground">Metadata JSON format</h3>
+            <p className="text-sm text-foreground/70 mb-3">Provide a JSON object with the fields below. Example (node):</p>
+            <pre className="text-xs p-3 bg-foreground/5 rounded mb-3 overflow-auto">{
+              `{
+    "name": "My Ground Station",
+    "specs": "S-band 100 Mbps",
+    "dishSize": "2.4",
+    "polarization": "RHCP",
+    "maxDataRate": "100",
+    "uptime": 98,
+    "coordinates": { "lat": 140583, "lon": 100511 },
+    "pricePerMinute": "1000000000000000000",
+    "paymentToken": "0x0000000000000000000000000000000000000001",
+    "createdAt": "2025-10-23T12:00:00Z"
+  }`}
+            </pre>
+            <div className="flex gap-3">
+              <button onClick={() => setShowJsonInfoModal(false)} className="ml-auto px-4 py-2 bg-primary text-white rounded-md">Close</button>
             </div>
           </div>
         </div>

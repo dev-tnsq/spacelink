@@ -20,7 +20,7 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "SpaceLink",
   description:
-    "SpaceLink is a decentralized ground station network on Creditcoin, slashing satellite relay costs. It links operators with global antenna owners for reliable data transfers. Node owners earn CTC and credit, bridging the $200B unbanked gap in Asia. Pay per use, verified on-chain with an optimistic 24-hour dispute window, stored on Walrus.",
+    "SpaceLink is a decentralized ground station network on Creditcoin, slashing satellite relay costs. It links operators with global antenna owners for reliable data transfers. Node owners earn CTC and credit, bridging the $200B unbanked gap in Asia. Pay per use, verified on-chain with an optimistic 24-hour dispute window, metadata stored on IPFS.",
   icons: {
     icon: "/brand/spacelink-logo.jpg",
   },

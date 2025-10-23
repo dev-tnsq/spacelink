@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useAppData } from "./context/AppDataContext";
 import { useWallet } from "./context/WalletContext";
 import { useRegisterSatellite } from "@/lib/hooks";
 import WalletButton from './wallet-button';
+import { uploadJsonToIpfs } from '@/lib/ipfs';
 
 const MARKETPLACE_ABI = [
   "function STAKE_AMOUNT() view returns (uint256)",
@@ -24,6 +25,12 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
   const [dataRateMbps, setDataRateMbps] = useState("");
   const [contact, setContact] = useState("");
   const [ipfsCID, setIpfsCID] = useState("");
+  const [priceCtc, setPriceCtc] = useState<string>("1");
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null as any);
+  const [showJsonInfoModal, setShowJsonInfoModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -86,11 +93,47 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
       const stakeAmount = BigInt("1000000000000000000"); // 1 CTC in wei
 
       // Call contract to register satellite
+      // Prepare metadata JSON and upload to IPFS if no CID provided
+      let finalCid = ipfsCID;
+      if (!finalCid || finalCid.trim().length === 0) {
+        const metadata: any = {
+          name,
+          norad,
+          tle1,
+          tle2,
+          downlinkMHz,
+          dataRateMbps,
+          contact,
+          createdAt: new Date().toISOString(),
+        };
+        if (priceCtc && priceCtc.trim().length > 0) {
+          try {
+            const parts = priceCtc.trim().split('.')
+            const whole = parts[0] || '0'
+            const frac = parts[1] || ''
+            const fracPadded = (frac + '000000000000000000').slice(0, 18)
+            const wei = BigInt(whole) * BigInt(10 ** 18) + BigInt(fracPadded)
+            metadata.pricePerMinute = wei.toString()
+          } catch (e) {
+            // ignore
+          }
+        }
+        try {
+          const cid = await uploadJsonToIpfs(metadata)
+          finalCid = cid
+          setMessage(`Uploaded metadata to IPFS: ${cid}`)
+        } catch (err: any) {
+          setMessage('Failed to upload metadata to IPFS: ' + (err?.message || String(err)))
+          setLoading(false)
+          return
+        }
+      }
+
       const hash = await registerSatellite(
         walletClient,
         tle1,
         tle2,
-        ipfsCID || "QmDefaultSatelliteMetadata",
+        finalCid || "QmDefaultSatelliteMetadata",
         stakeAmount
       );
 
@@ -170,10 +213,86 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
       <label className="text-xs text-foreground/60">Contact (email)</label>
       <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="operator@example.com" className="w-full p-3 rounded-md mb-3 bg-transparent border border-[#2b2f3a]" />
 
-      <label className="text-xs text-foreground/60">IPFS CID (optional)</label>
-      <input value={ipfsCID} onChange={(e) => setIpfsCID(e.target.value)} className="w-full p-3 rounded-md mb-3 bg-transparent border border-[#2b2f3a]" placeholder="bafy..." />
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-xs text-foreground/60">Metadata JSON</label>
+        <button type="button" onClick={() => setShowJsonInfoModal(true)} className="text-foreground/50 hover:text-foreground/70">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+        </button>
+        <div className="text-xs text-foreground/50">Drag & drop a metadata JSON file or choose a file to auto-upload to IPFS. Uploaded CID will be used when registering.</div>
+      </div>
 
-        <div className="flex gap-3">
+      <div
+        onDrop={(e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (!file) return;
+          if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+            setMessage('Please upload a .json file');
+            return;
+          }
+          (async () => {
+            try {
+              setUploadingFile(true);
+              setMessage(null);
+              const text = await file.text();
+              const json = JSON.parse(text);
+              setFilePreview(JSON.stringify(json, null, 2).slice(0, 400));
+              // Merge operator-set price into JSON if provided
+              if (priceCtc && priceCtc.trim().length > 0) {
+                try {
+                  const parts = priceCtc.trim().split('.')
+                  const whole = parts[0] || '0'
+                  const frac = parts[1] || ''
+                  const fracPadded = (frac + '000000000000000000').slice(0, 18)
+                  const wei = BigInt(whole) * BigInt(10 ** 18) + BigInt(fracPadded)
+                  json.pricePerMinute = wei.toString()
+                } catch (e) {
+                  // ignore
+                }
+              }
+              const cid = await uploadJsonToIpfs(json);
+              setIpfsCID(cid);
+              setUploadedFileName(file.name);
+              setMessage(`Uploaded metadata to IPFS: ${cid}`);
+            } catch (err: any) {
+              setMessage('Failed to upload file: ' + (err?.message || String(err)));
+            } finally {
+              setUploadingFile(false);
+            }
+          })();
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        className="mt-2 mb-3 p-3 border-dashed border-2 rounded-md border-foreground/10 text-sm text-foreground/50"
+      >
+        <div className="flex items-center justify-between">
+          <div>Drop a satellite metadata JSON here, or</div>
+          <div>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 bg-background border rounded-md text-sm">Choose File</button>
+          </div>
+        </div>
+        <input ref={fileInputRef} type="file" accept="application/json" onChange={async (e) => {
+          const file = e.target.files?.[0]; if (!file) return; try {
+            setUploadingFile(true); setMessage(null);
+            const text = await file.text(); const json = JSON.parse(text);
+            setFilePreview(JSON.stringify(json, null, 2).slice(0,400)); const cid = await uploadJsonToIpfs(json);
+            setIpfsCID(cid); setUploadedFileName(file.name); setMessage(`Uploaded metadata to IPFS: ${cid}`);
+          } catch (err: any) {
+            setMessage('Failed to upload file: ' + (err?.message || String(err)));
+          } finally { setUploadingFile(false); }
+        }} className="hidden" />
+
+        <div className="mt-2 text-xs text-foreground/50">{uploadingFile ? 'Uploading file...' : uploadedFileName ? `Selected: ${uploadedFileName}` : 'No file selected'}</div>
+
+        {filePreview && (
+          <pre className="mt-2 p-2 bg-background/5 rounded text-xs overflow-auto max-h-40 whitespace-pre-wrap">{filePreview}</pre>
+        )}
+      </div>
+
+      {ipfsCID && (
+        <div className="text-xs text-foreground/60 mb-3">Uploaded CID: <a className="text-primary" href={`https://ipfs.io/ipfs/${ipfsCID}`} target="_blank" rel="noreferrer">{ipfsCID}</a></div>
+      )}
+
+      <div className="flex gap-3">
         <div className="flex gap-3">
           <button type="submit" disabled={loading} className="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-60">{loading ? "Registering…" : "Save Satellite"}</button>
           {!address ? (
@@ -188,7 +307,8 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
           // fill example TLE (ISS)
           setTle1("1 25544U 98067A   21275.51782528  .00016717  00000-0  10270-3 0  9005");
           setTle2("2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.48919078309904");
-          setIpfsCID("");
+            setIpfsCID("");
+            setPriceCtc("1");
         }} className="px-4 py-2 bg-background border rounded-md">Use Example</button>
       </div>
 
@@ -277,6 +397,30 @@ export default function SatelliteForm({ marketplaceAddress = process.env.NEXT_PU
             >
               Switch Network
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {/* Metadata JSON format info modal */}
+    {showJsonInfoModal && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-background border border-foreground/20 rounded-lg p-6 max-w-2xl w-full mx-4">
+          <h3 className="text-lg font-semibold mb-3 text-foreground">Satellite metadata JSON format</h3>
+          <p className="text-sm text-foreground/70 mb-3">Provide a JSON object with the fields below. Example (satellite):</p>
+          <pre className="text-xs p-3 bg-foreground/5 rounded mb-3 overflow-auto">{
+            `{
+  "name": "DemoSat-1",
+  "norad": "25544",
+  "tle1": "1 25544U 98067A   21275.51782528  .00016717  00000-0  10270-3 0  9005",
+  "tle2": "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.48919078309904",
+  "downlinkMHz": "137.5",
+  "dataRateMbps": "1.2",
+  "contact": "operator@example.com",
+  "createdAt": "2025-10-23T12:00:00Z"
+}`}
+          </pre>
+          <div className="flex gap-3">
+            <button onClick={() => setShowJsonInfoModal(false)} className="ml-auto px-4 py-2 bg-primary text-white rounded-md">Close</button>
           </div>
         </div>
       </div>

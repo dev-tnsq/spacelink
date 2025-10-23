@@ -1,7 +1,9 @@
 /**
- * Chainlink Functions - TLE Validator
- * 
- * This JavaScript runs on Chainlink DON (Decentralized Oracle Network)
+ * Chainlink Functions (reference) - TLE Validator
+ *
+ * Reference code for TLE validation. Production metadata is stored on IPFS
+ * and Chainlink integration is optional — this file is provided as an
+ * illustrative example for on-DON validation logic.
  * to validate Two-Line Element (TLE) satellite orbital data
  * 
  * Input args:
