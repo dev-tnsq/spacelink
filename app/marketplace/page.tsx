@@ -59,7 +59,7 @@ export default function MarketplacePage() {
             {selected ? (
               <div>
                 <h3 className="font-semibold">Details</h3>
-                <pre className="text-xs mt-2">{JSON.stringify((nodes.find((n:any) => n.id === selected) || satellites.find((s:any) => s.id === selected)), null, 2)}</pre>
+                <pre className="text-xs mt-2">{JSON.stringify((nodes.find((n:any) => n.id === selected) || satellites.find((s:any) => s.id === selected)), (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
                 <div className="mt-3">
                   {nodes.find((n:any) => n.id === selected) ? (
                     <div className="flex gap-3">
